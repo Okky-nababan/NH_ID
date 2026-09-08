@@ -19,6 +19,7 @@ const MANAGE_LINKS: NavLink[] = [
   { href: "/kepengurusan", label: "Kepengurusan" },
   { href: "/periode", label: "Periode", permission: "MANAGE_PERIODS" },
   { href: "/koor", label: "Partitur Koor" },
+  { href: "/dokumen", label: "Dokumen" },
   { href: "/pengumuman", label: "Pengumuman" },
 ];
 
@@ -29,6 +30,7 @@ const MEMBER_LINKS: NavLink[] = [
   { href: "/kegiatan", label: "Kegiatan" },
   { href: "/kepengurusan", label: "Kepengurusan" },
   { href: "/koor", label: "Partitur Koor" },
+  { href: "/dokumen", label: "Dokumen" },
   { href: "/pengumuman", label: "Pengumuman" },
 ];
 
