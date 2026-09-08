@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
@@ -31,8 +30,10 @@ export default async function LaporanKasPage({
 }: {
   searchParams: Promise<{ year?: string }>;
 }) {
+  // Laporan Kas sengaja terbuka untuk SEMUA anggota yang login (transparansi
+  // keuangan organisasi) -- tidak lagi di-gate izin VIEW_CASH_REPORT. Aksi
+  // kelola (tombol sinkron spreadsheet) tetap di-gate `canManage` di bawah.
   const session = await auth();
-  if (!hasPermission(session, "VIEW_CASH_REPORT")) redirect("/kas-saya");
   const canManage = hasPermission(session, "MANAGE_CASH_PAYMENT");
 
   const { year: yearParam } = await searchParams;

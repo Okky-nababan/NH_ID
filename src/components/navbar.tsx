@@ -9,13 +9,20 @@ import type { Permission, Role } from "@/generated/prisma/client";
 
 type NavLink = { href: string; label: string; permission?: Permission };
 
+// Data Anggota dan Laporan Kas SENGAJA tanpa `permission` -- terbuka untuk
+// semua anggota yang login, bukan hanya yang diberi izin granular. Data
+// kontak sensitif (telepon/email) di halaman Data Anggota tetap disamarkan
+// untuk yang bukan pengelola (lihat src/app/(app)/anggota/page.tsx), dan
+// aksi kelola di Laporan Kas/Uang Kas tetap di-gate `canManage` di halaman
+// masing-masing. "Uang Kas" (kelola pembayaran) tetap di-gate izin karena
+// berisi form tambah/hapus transaksi.
 const MANAGE_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/anggota", label: "Data Anggota", permission: "MANAGE_MEMBERS" },
+  { href: "/anggota", label: "Data Anggota" },
   { href: "/kegiatan", label: "Kegiatan" },
   { href: "/kehadiran", label: "Kehadiran", permission: "MANAGE_ATTENDANCE" },
   { href: "/kas", label: "Uang Kas", permission: "VIEW_CASH_REPORT" },
-  { href: "/laporan-kas", label: "Laporan Kas", permission: "VIEW_CASH_REPORT" },
+  { href: "/laporan-kas", label: "Laporan Kas" },
   { href: "/kepengurusan", label: "Kepengurusan" },
   { href: "/periode", label: "Periode", permission: "MANAGE_PERIODS" },
   { href: "/koor", label: "Partitur Koor" },
@@ -26,10 +33,10 @@ const MANAGE_LINKS: NavLink[] = [
 const MEMBER_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/profil", label: "Profil Saya" },
-  { href: "/anggota", label: "Data Anggota", permission: "MANAGE_MEMBERS" },
+  { href: "/anggota", label: "Data Anggota" },
   { href: "/kas-saya", label: "Kas Saya" },
   { href: "/kas", label: "Uang Kas", permission: "VIEW_CASH_REPORT" },
-  { href: "/laporan-kas", label: "Laporan Kas", permission: "VIEW_CASH_REPORT" },
+  { href: "/laporan-kas", label: "Laporan Kas" },
   { href: "/kegiatan", label: "Kegiatan" },
   { href: "/kepengurusan", label: "Kepengurusan" },
   { href: "/koor", label: "Partitur Koor" },
