@@ -18,6 +18,7 @@ const MANAGE_LINKS: NavLink[] = [
   { href: "/laporan-kas", label: "Laporan", permission: "VIEW_CASH_REPORT" },
   { href: "/kepengurusan", label: "Kepengurusan" },
   { href: "/periode", label: "Periode", permission: "MANAGE_PERIODS" },
+  { href: "/koor", label: "Partitur Koor" },
   { href: "/pengumuman", label: "Pengumuman" },
 ];
 
@@ -27,6 +28,7 @@ const MEMBER_LINKS: NavLink[] = [
   { href: "/kas-saya", label: "Kas Saya" },
   { href: "/kegiatan", label: "Kegiatan" },
   { href: "/kepengurusan", label: "Kepengurusan" },
+  { href: "/koor", label: "Partitur Koor" },
   { href: "/pengumuman", label: "Pengumuman" },
 ];
 

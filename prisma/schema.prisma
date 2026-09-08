@@ -39,6 +39,7 @@ enum Permission {
   MANAGE_PERIODS
   MANAGE_USERS
   VIEW_AUDIT_LOG
+  MANAGE_CHOIR
 }
 
 enum ActivityType {
@@ -135,6 +136,7 @@ model User {
   posts             Post[]
   comments          Comment[]
   auditLogs         AuditLog[]
+  choirSongs        ChoirSong[]
 
   @@index([membershipStatus])
   @@index([role])
@@ -269,6 +271,37 @@ model Transaction {
   createdAt   DateTime        @default(now())
 
   user User? @relation(fields: [userId], references: [id])
+}
+
+// ============ Partitur Koor ============
+
+/// Satu judul lagu koor. Halaman-halaman partiturnya (hasil scan) disimpan
+/// di ChoirSongPage, ditampilkan sebagai galeri gambar berurutan.
+model ChoirSong {
+  id        String   @id @default(cuid())
+  title     String
+  order     Int      @default(0)
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User?           @relation(fields: [createdById], references: [id])
+  pages     ChoirSongPage[]
+
+  @@index([order])
+}
+
+model ChoirSongPage {
+  id         String   @id @default(cuid())
+  songId     String
+  pageNumber Int
+  imageUrl   String
+  createdAt  DateTime @default(now())
+
+  song ChoirSong @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([songId, pageNumber])
+  @@index([songId])
 }
 
 // ============ Pengumuman & Forum (tidak berubah) ============

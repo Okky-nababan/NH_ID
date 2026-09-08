@@ -30,4 +30,5 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   MANAGE_PERIODS: "Kelola Periode Kepengurusan",
   MANAGE_USERS: "Kelola User & Izin",
   VIEW_AUDIT_LOG: "Lihat Audit Log",
+  MANAGE_CHOIR: "Kelola Partitur Koor",
 };

@@ -47,6 +47,7 @@ export const adminUserUpdateSchema = z.object({
         "MANAGE_PERIODS",
         "MANAGE_USERS",
         "VIEW_AUDIT_LOG",
+        "MANAGE_CHOIR",
       ])
     )
     .optional(),
@@ -177,3 +178,11 @@ export const commentSchema = z.object({
   content: z.string().trim().min(1, "Komentar tidak boleh kosong"),
 });
 export type CommentInput = z.infer<typeof commentSchema>;
+
+export const choirSongSchema = z.object({
+  title: z.string().trim().min(1, "Judul lagu wajib diisi"),
+  order: z.coerce.number().int().optional(),
+  pageUrls: z.array(z.string().min(1)).min(1, "Unggah minimal 1 halaman partitur"),
+});
+export type ChoirSongInput = z.input<typeof choirSongSchema>;
+export type ChoirSongOutput = z.output<typeof choirSongSchema>;
