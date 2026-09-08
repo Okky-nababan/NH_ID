@@ -14,6 +14,9 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Password ditampilkan apa adanya (tidak disamarkan) sesuai permintaan —
+  // tombol mata tetap disediakan kalau user ingin menyembunyikannya sendiri.
+  const [showPassword, setShowPassword] = useState(true);
 
   const {
     register,
@@ -67,14 +70,29 @@ export function LoginForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700">
-            Password
-          </label>
-          <input
-            type="password"
-            {...register("password")}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-          />
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-slate-700">
+              Password
+            </label>
+            <Link href="/lupa-password" className="text-xs font-medium text-brand hover:underline">
+              Lupa password?
+            </Link>
+          </div>
+          <div className="relative mt-1">
+            <input
+              type={showPassword ? "text" : "password"}
+              {...register("password")}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              tabIndex={-1}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              {showPassword ? "Sembunyikan" : "Tampilkan"}
+            </button>
+          </div>
           {errors.password && (
             <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
           )}

@@ -179,6 +179,19 @@ export const commentSchema = z.object({
 });
 export type CommentInput = z.infer<typeof commentSchema>;
 
+/** Publik: form "Lupa Password" di halaman login. */
+export const passwordResetRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Email tidak valid"),
+  message: z.string().trim().max(500).optional().or(z.literal("")),
+});
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+
+/** Admin: set password baru untuk user yang mengajukan permintaan reset. */
+export const adminPasswordResetSchema = z.object({
+  newPassword: z.string().min(8, "Password minimal 8 karakter"),
+});
+export type AdminPasswordResetInput = z.infer<typeof adminPasswordResetSchema>;
+
 export const choirSongSchema = z.object({
   title: z.string().trim().min(1, "Judul lagu wajib diisi"),
   order: z.coerce.number().int().optional(),

@@ -1,0 +1,19 @@
+feat: perbaiki menu navigasi + password terlihat + fitur lupa password
+
+- Navbar: tambah Data Anggota, Uang Kas, dan Laporan Kas ke daftar menu
+  untuk role ANGGOTA (sebelumnya hanya muncul untuk PENGURUS/ADMIN) --
+  tetap di-gate izin MANAGE_MEMBERS/VIEW_CASH_REPORT seperti biasa, jadi
+  hanya tampil untuk user yang memang sudah diberi izin tersebut.
+- Login: field password sekarang default terlihat (tidak disamarkan),
+  dengan tombol Sembunyikan/Tampilkan bagi yang ingin menyamarkannya
+  sendiri.
+- Tambah fitur Lupa Password (tanpa infrastruktur email):
+  - Halaman publik /lupa-password -- user isi email + catatan opsional,
+    tersimpan sebagai PasswordResetRequest.
+  - Halaman baru /admin/password-reset -- Admin melihat daftar permintaan
+    dan bisa langsung set password baru untuk user terkait, atau
+    menandai permintaan selesai tanpa reset.
+  - Model PasswordResetRequest baru di schema + migration.
+  - Link "Lupa password?" ditambahkan di halaman login.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
