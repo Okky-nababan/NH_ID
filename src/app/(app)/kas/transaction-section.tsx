@@ -151,6 +151,7 @@ export function TransactionSection({
             <tr>
               <th className="px-4 py-2 text-left font-semibold text-slate-600">Tanggal</th>
               <th className="px-4 py-2 text-left font-semibold text-slate-600">Kategori</th>
+              <th className="px-4 py-2 text-left font-semibold text-slate-600">Keterangan</th>
               <th className="px-4 py-2 text-right font-semibold text-slate-600">Jumlah</th>
               {canManage && (
                 <th className="px-4 py-2 text-left font-semibold text-slate-600">Aksi</th>
@@ -160,16 +161,17 @@ export function TransactionSection({
           <tbody className="divide-y divide-slate-100">
             {transactions.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={canManage ? 5 : 4} className="px-4 py-6 text-center text-slate-500">
                   Belum ada transaksi.
                 </td>
               </tr>
             ) : (
               transactions.map((t) => (
                 <tr key={t.id}>
-                  <td className="px-4 py-2 text-slate-600">{t.date}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-slate-600">{t.date}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-slate-600">{t.category}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {t.category}
+                    {t.description || <span className="text-slate-300">-</span>}
                     {t.userName && <span className="text-xs text-slate-400"> · {t.userName}</span>}
                   </td>
                   <td

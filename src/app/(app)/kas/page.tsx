@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
+import { QueryParamSelect } from "@/components/query-param-select";
 import { CashPaymentList } from "./cash-payment-list";
 import { TransactionSection } from "./transaction-section";
 
@@ -9,12 +10,21 @@ function formatDateInput(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-export default async function KasPage() {
+export default async function KasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string }>;
+}) {
   const session = await auth();
   const canView = hasPermission(session, "VIEW_CASH_REPORT");
   if (!canView) redirect("/kas-saya");
 
   const canManage = hasPermission(session, "MANAGE_CASH_PAYMENT");
+
+  const { year: yearParam } = await searchParams;
+  const year = Number(yearParam) || new Date().getFullYear();
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year + 1, 0, 1);
 
   const [payments, transactions, members] = await Promise.all([
     prisma.cashPayment.findMany({
@@ -23,9 +33,9 @@ export default async function KasPage() {
       take: 100,
     }),
     prisma.transaction.findMany({
+      where: { date: { gte: yearStart, lt: yearEnd } },
       orderBy: { date: "desc" },
       include: { user: { select: { name: true } } },
-      take: 100,
     }),
     prisma.user.findMany({
       where: { isActive: true },
@@ -33,6 +43,8 @@ export default async function KasPage() {
       select: { id: true, name: true },
     }),
   ]);
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   return (
     <div className="space-y-10">
@@ -66,7 +78,17 @@ export default async function KasPage() {
       </section>
 
       <section>
-        <h2 className="text-base font-semibold text-slate-900">Ledger Organisasi</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-900">
+            Ledger Organisasi <span className="font-normal text-slate-400">({transactions.length} transaksi di tahun {year})</span>
+          </h2>
+          <QueryParamSelect
+            paramName="year"
+            fallback={String(year)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            options={years.map((y) => ({ value: String(y), label: String(y) }))}
+          />
+        </div>
         <div className="mt-3">
           <TransactionSection
             transactions={transactions.map((t) => ({
