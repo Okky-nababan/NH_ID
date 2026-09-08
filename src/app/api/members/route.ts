@@ -1,0 +1,106 @@
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import { requireUser, requirePermission } from "@/lib/api-auth";
+import { hasPermission } from "@/lib/permissions";
+import { memberSchema } from "@/lib/validation";
+import { logAudit } from "@/lib/audit";
+
+const BASE_SELECT = {
+  id: true,
+  memberNumber: true,
+  name: true,
+  nickname: true,
+  gender: true,
+  birthPlace: true,
+  birthDate: true,
+  phone: true,
+  email: true,
+  address: true,
+  membershipStatus: true,
+  joinedAt: true,
+  photoUrl: true,
+  isActive: true,
+  role: true,
+  notes: true,
+} as const;
+
+export async function GET() {
+  const { session, error } = await requireUser();
+  if (error) return error;
+
+  const members = await prisma.user.findMany({
+    orderBy: { name: "asc" },
+    select: BASE_SELECT,
+  });
+
+  const canSeeAll = hasPermission(session, "MANAGE_MEMBERS");
+
+  // Privasi: anggota biasa tidak boleh melihat telepon/email anggota lain.
+  const redacted = members.map((m) => {
+    if (canSeeAll || m.id === session!.user.id) return m;
+    return { ...m, phone: "-", email: "-", notes: null };
+  });
+
+  return NextResponse.json({ members: redacted });
+}
+
+export async function POST(request: Request) {
+  const { session, error } = await requirePermission(
+    "MANAGE_MEMBERS",
+    "Anda tidak memiliki izin untuk mengelola data anggota."
+  );
+  if (error) return error;
+
+  const body = await request.json().catch(() => null);
+  const parsed = memberSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Data tidak valid", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+  const data = parsed.data;
+
+  if (!data.password) {
+    return NextResponse.json({ error: "Password wajib diisi untuk anggota baru" }, { status: 400 });
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email: data.email } });
+  if (existing) {
+    return NextResponse.json({ error: "Email sudah terdaftar" }, { status: 409 });
+  }
+
+  const passwordHash = await bcrypt.hash(data.password, 10);
+
+  const member = await prisma.user.create({
+    data: {
+      name: data.name,
+      nickname: data.nickname || null,
+      email: data.email,
+      phone: data.phone,
+      passwordHash,
+      gender: data.gender,
+      birthPlace: data.birthPlace || null,
+      birthDate: data.birthDate ? new Date(data.birthDate) : null,
+      address: data.address || null,
+      memberNumber: data.memberNumber || null,
+      membershipStatus: data.membershipStatus,
+      notes: data.notes || null,
+      photoUrl: data.photoUrl || null,
+      role: "ANGGOTA",
+      isActive: true,
+    },
+  });
+
+  await logAudit({
+    userId: session!.user.id,
+    action: "CREATE_MEMBER",
+    module: "member",
+    recordId: member.id,
+    description: `Menambahkan anggota baru: ${member.name}`,
+    request,
+  });
+
+  return NextResponse.json({ member }, { status: 201 });
+}

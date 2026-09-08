@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ Enums ============
+
+enum Role {
+  ADMIN
+  PENGURUS
+  ANGGOTA
+}
+
+enum Gender {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum MembershipStatus {
+  AKTIF
+  TIDAK_AKTIF
+  PINDAH
+  MENGUNDURKAN_DIRI
+}
+
+/// Izin granular yang bisa diberikan ke user PENGURUS tertentu.
+/// ADMIN otomatis memiliki semua izin tanpa perlu baris UserPermission.
+enum Permission {
+  MANAGE_MEMBERS
+  MANAGE_ACTIVITIES
+  MANAGE_ATTENDANCE
+  MANAGE_CASH_PAYMENT
+  VIEW_CASH_REPORT
+  MANAGE_POSITIONS
+  MANAGE_PERIODS
+  MANAGE_USERS
+  VIEW_AUDIT_LOG
+}
+
+enum ActivityType {
+  IBADAH
+  KEBAKTIAN
+  PERSEKUTUAN
+  RAPAT
+  OLAHRAGA
+  BAKTI_SOSIAL
+  ACARA_GEREJA
+  RETREAT
+  PELAYANAN
+  KEGIATAN_SOSIAL
+  LAINNYA
+}
+
+enum ActivityStatus {
+  DIRENCANAKAN
+  BERLANGSUNG
+  SELESAI
+  DIBATALKAN
+}
+
+enum AttendanceStatus {
+  HADIR
+  TIDAK_HADIR
+  IZIN
+  SAKIT
+}
+
+enum CashPaymentStatus {
+  BELUM_BAYAR
+  LUNAS
+  PENDING
+  DIBATALKAN
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  LAINNYA
+}
+
+enum PositionStatus {
+  AKTIF
+  NONAKTIF
+}
+
+enum TransactionType {
+  MASUK
+  KELUAR
+}
+
+enum PostType {
+  PENGUMUMAN
+  FORUM
+}
+
+// ============ Core: User (akun + profil anggota) ============
+
+model User {
+  id           String @id @default(cuid())
+  name         String
+  email        String @unique
+  phone        String
+  passwordHash String
+
+  role     Role    @default(ANGGOTA)
+  isActive Boolean @default(true)
+
+  memberNumber      String?          @unique
+  nickname          String?
+  gender            Gender?
+  birthPlace        String?
+  birthDate         DateTime?
+  address           String?
+  membershipStatus  MembershipStatus @default(AKTIF)
+  notes             String?
+  photoUrl          String?
+  joinedAt          DateTime         @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permissions       UserPermission[]
+  positions         Position[]
+  attendances       Attendance[]        @relation("AttendanceMember")
+  recordedAttendance Attendance[]       @relation("AttendanceRecorder")
+  cashPayments      CashPayment[]       @relation("CashPaymentMember")
+  recordedPayments  CashPayment[]       @relation("CashPaymentRecorder")
+  transactions      Transaction[]
+  createdActivities Activity[]          @relation("ActivityCreator")
+  picActivities     Activity[]          @relation("ActivityPIC")
+  posts             Post[]
+  comments          Comment[]
+  auditLogs         AuditLog[]
+
+  @@index([membershipStatus])
+  @@index([role])
+}
+
+model UserPermission {
+  id         String     @id @default(cuid())
+  userId     String
+  permission Permission
+  createdAt  DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+}
+
+// ============ Kepengurusan & Periode ============
+
+model ManagementPeriod {
+  id        String   @id @default(cuid())
+  name      String
+  startYear Int
+  endYear   Int
+  isActive  Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  positions Position[]
+}
+
+model Position {
+  id        String         @id @default(cuid())
+  title     String
+  userId    String
+  periodId  String
+  startDate DateTime?
+  endDate   DateTime?
+  status    PositionStatus @default(AKTIF)
+  order     Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user   User             @relation(fields: [userId], references: [id])
+  period ManagementPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId])
+}
+
+// ============ Kegiatan & Kehadiran ============
+
+model Activity {
+  id               String         @id @default(cuid())
+  name             String
+  type             ActivityType
+  description      String
+  date             DateTime
+  location         String
+  personInChargeId String?
+  status           ActivityStatus @default(DIRENCANAKAN)
+  notes            String?
+  photoUrl         String?
+  createdById      String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  createdBy      User         @relation("ActivityCreator", fields: [createdById], references: [id])
+  personInCharge User?        @relation("ActivityPIC", fields: [personInChargeId], references: [id])
+  attendances    Attendance[]
+
+  @@index([date])
+}
+
+model Attendance {
+  id           String           @id @default(cuid())
+  activityId   String
+  userId       String
+  status       AttendanceStatus
+  recordedById String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User     @relation("AttendanceMember", fields: [userId], references: [id], onDelete: Cascade)
+  recordedBy User     @relation("AttendanceRecorder", fields: [recordedById], references: [id])
+
+  @@unique([activityId, userId])
+}
+
+// ============ Kas ============
+
+/// Iuran bulanan terstruktur per anggota. HANYA bisa dicatat/diubah oleh
+/// user dengan permission MANAGE_CASH_PAYMENT (diverifikasi di server).
+model CashPayment {
+  id            String            @id @default(cuid())
+  userId        String
+  month         Int
+  year          Int
+  amount        Int
+  paymentDate   DateTime?
+  status        CashPaymentStatus @default(BELUM_BAYAR)
+  method        PaymentMethod?
+  notes         String?
+  recordedById  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  user       User  @relation("CashPaymentMember", fields: [userId], references: [id], onDelete: Cascade)
+  recordedBy User? @relation("CashPaymentRecorder", fields: [recordedById], references: [id])
+
+  @@unique([userId, month, year])
+  @@index([year, month])
+}
+
+/// Ledger umum organisasi (donasi, pengeluaran non-iuran) — terpisah dari
+/// CashPayment (iuran bulanan per anggota). Sama-sama di-gate permission
+/// MANAGE_CASH_PAYMENT untuk tulis.
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  category    String
+  amount      Int
+  description String?
+  date        DateTime
+  userId      String?
+  createdAt   DateTime        @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+// ============ Pengumuman & Forum (tidak berubah) ============
+
+model Post {
+  id        String   @id @default(cuid())
+  type      PostType @default(FORUM)
+  title     String
+  content   String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author   User      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+}
+
+// ============ Audit Log ============
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  module      String
+  recordId    String?
+  description String
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([module])
+  @@index([createdAt])
+}
