@@ -23,6 +23,7 @@ export function PositionForm({
 }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [useManualName, setUseManualName] = useState(!!initial?.memberName && !initial?.userId);
 
   const {
     register,
@@ -40,7 +41,7 @@ export function PositionForm({
     const res = await fetch(positionId ? `/api/positions/${positionId}` : "/api/positions", {
       method: positionId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(useManualName ? { ...data, userId: "" } : { ...data, memberName: "" }),
     });
     setSubmitting(false);
     if (!res.ok) {
@@ -48,7 +49,16 @@ export function PositionForm({
       setFormError(body.error || "Gagal menyimpan jabatan");
       return;
     }
-    if (!positionId) reset({ title: "", userId: "", periodId: initial?.periodId, status: "AKTIF", order: 0 });
+    if (!positionId) {
+      reset({
+        title: "",
+        userId: "",
+        memberName: "",
+        periodId: initial?.periodId,
+        status: "AKTIF",
+        order: 0,
+      });
+    }
     onSaved();
   };
 
@@ -56,21 +66,51 @@ export function PositionForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <input
         type="text"
-        placeholder="Nama Jabatan (mis. Ketua, Bendahara)"
+        placeholder="Nama Jabatan (mis. Ketua, Bendahara, Koordinator Seksi Rohani)"
         {...register("title")}
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
       />
       {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
 
-      <select {...register("userId")} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-        <option value="">- Pilih Anggota -</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-      {errors.userId && <p className="text-sm text-red-600">{errors.userId.message}</p>}
+      <div className="flex gap-4 text-xs text-slate-600">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="radio"
+            checked={!useManualName}
+            onChange={() => setUseManualName(false)}
+          />
+          Pilih anggota terdaftar
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="radio" checked={useManualName} onChange={() => setUseManualName(true)} />
+          Ketik nama manual (belum punya akun)
+        </label>
+      </div>
+
+      {useManualName ? (
+        <div>
+          <input
+            type="text"
+            placeholder="Nama sesuai SK/dokumen resmi"
+            {...register("memberName")}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            Kalau orangnya nanti daftar akun, hubungkan jabatan ini ke akunnya lewat mode &quot;Pilih
+            anggota terdaftar&quot;.
+          </p>
+        </div>
+      ) : (
+        <select {...register("userId")} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <option value="">- Pilih Anggota -</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {errors.memberName && <p className="text-sm text-red-600">{errors.memberName.message}</p>}
 
       <select {...register("periodId")} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
         <option value="">- Pilih Periode -</option>

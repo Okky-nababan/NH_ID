@@ -43,7 +43,8 @@ export async function POST(request: Request) {
   const position = await prisma.position.create({
     data: {
       title: data.title,
-      userId: data.userId,
+      userId: data.userId || null,
+      memberName: data.userId ? null : data.memberName || null,
       periodId: data.periodId,
       startDate: data.startDate ? new Date(data.startDate) : null,
       endDate: data.endDate ? new Date(data.endDate) : null,
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
     action: "CREATE_POSITION",
     module: "position",
     recordId: position.id,
-    description: `Menetapkan ${position.user.name} sebagai ${position.title}`,
+    description: `Menetapkan ${position.user?.name ?? position.memberName} sebagai ${position.title}`,
     request,
   });
 

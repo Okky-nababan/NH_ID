@@ -85,15 +85,26 @@ export const managementPeriodSchema = z.object({
 export type ManagementPeriodInput = z.input<typeof managementPeriodSchema>;
 export type ManagementPeriodOutput = z.output<typeof managementPeriodSchema>;
 
-export const positionSchema = z.object({
-  title: z.string().trim().min(2, "Nama jabatan wajib diisi"),
-  userId: z.string().min(1, "Anggota wajib dipilih"),
-  periodId: z.string().min(1, "Periode wajib dipilih"),
-  startDate: z.string().optional().or(z.literal("")),
-  endDate: z.string().optional().or(z.literal("")),
-  status: z.enum(["AKTIF", "NONAKTIF"]),
-  order: z.coerce.number().int().min(0).optional(),
-});
+/**
+ * Jabatan TIDAK wajib terhubung ke akun anggota terdaftar (mis. nama dari
+ * SK kepengurusan yang belum daftar akun) — tapi harus diisi salah satu:
+ * `userId` (anggota terdaftar) ATAU `memberName` (nama bebas).
+ */
+export const positionSchema = z
+  .object({
+    title: z.string().trim().min(2, "Nama jabatan wajib diisi"),
+    userId: z.string().optional().or(z.literal("")),
+    memberName: z.string().trim().max(100).optional().or(z.literal("")),
+    periodId: z.string().min(1, "Periode wajib dipilih"),
+    startDate: z.string().optional().or(z.literal("")),
+    endDate: z.string().optional().or(z.literal("")),
+    status: z.enum(["AKTIF", "NONAKTIF"]),
+    order: z.coerce.number().int().min(0).optional(),
+  })
+  .refine((data) => data.userId || data.memberName, {
+    message: "Pilih anggota terdaftar atau isi nama secara manual",
+    path: ["memberName"],
+  });
 export type PositionInput = z.input<typeof positionSchema>;
 export type PositionOutput = z.output<typeof positionSchema>;
 

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
+import { QueryParamSelect } from "@/components/query-param-select";
 import { PositionBoard } from "./position-board";
 
 export default async function KepengurusanPage({
@@ -42,21 +43,15 @@ export default async function KepengurusanPage({
           <p className="mt-1 text-sm text-slate-500">Struktur organisasi Naposobulung.</p>
         </div>
         {periods.length > 0 && (
-          <form>
-            <select
-              name="periodId"
-              defaultValue={selectedPeriodId}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-              onChange={(e) => (e.currentTarget.form as HTMLFormElement).submit()}
-            >
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.isActive ? " (Aktif)" : ""}
-                </option>
-              ))}
-            </select>
-          </form>
+          <QueryParamSelect
+            paramName="periodId"
+            fallback={selectedPeriodId}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            options={periods.map((p) => ({
+              value: p.id,
+              label: `${p.name}${p.isActive ? " (Aktif)" : ""}`,
+            }))}
+          />
         )}
       </div>
 
@@ -71,8 +66,9 @@ export default async function KepengurusanPage({
               id: p.id,
               title: p.title,
               userId: p.userId,
-              userName: p.user.name,
-              userPhoto: p.user.photoUrl,
+              memberName: p.memberName,
+              displayName: p.user?.name ?? p.memberName ?? "-",
+              userPhoto: p.user?.photoUrl ?? null,
               periodId: p.periodId,
               status: p.status,
               order: p.order,

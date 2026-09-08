@@ -29,7 +29,8 @@ export async function PATCH(
     where: { id },
     data: {
       title: data.title,
-      userId: data.userId,
+      userId: data.userId || null,
+      memberName: data.userId ? null : data.memberName || null,
       periodId: data.periodId,
       startDate: data.startDate ? new Date(data.startDate) : null,
       endDate: data.endDate ? new Date(data.endDate) : null,
@@ -44,7 +45,7 @@ export async function PATCH(
     action: "UPDATE_POSITION",
     module: "position",
     recordId: position.id,
-    description: `Mengubah jabatan ${position.user.name}: ${position.title}`,
+    description: `Mengubah jabatan ${position.user?.name ?? position.memberName}: ${position.title}`,
     request,
   });
 
@@ -72,7 +73,7 @@ export async function DELETE(
     action: "DELETE_POSITION",
     module: "position",
     recordId: id,
-    description: `Menghapus jabatan ${position.user.name}: ${position.title}`,
+    description: `Menghapus jabatan ${position.user?.name ?? position.memberName}: ${position.title}`,
     request,
   });
 

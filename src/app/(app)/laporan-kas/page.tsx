@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
 import { MONTH_NAMES_ID } from "@/lib/constants";
+import { QueryParamSelect } from "@/components/query-param-select";
 import { PrintButton } from "./print-button";
 
 function formatRupiah(amount: number) {
@@ -66,22 +67,12 @@ export default async function LaporanKasPage({
           <p className="mt-1 text-sm text-slate-500">Ringkasan iuran bulanan tahun {year}.</p>
         </div>
         <div className="flex items-center gap-2">
-          <form>
-            <select
-              name="year"
-              defaultValue={year}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-              onChange={(e) => {
-                (e.currentTarget.form as HTMLFormElement).submit();
-              }}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </form>
+          <QueryParamSelect
+            paramName="year"
+            fallback={String(year)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            options={years.map((y) => ({ value: String(y), label: String(y) }))}
+          />
           <a
             href={`/api/reports/cash/export?year=${year}`}
             className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"

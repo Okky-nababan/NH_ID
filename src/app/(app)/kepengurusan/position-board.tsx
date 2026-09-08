@@ -10,8 +10,9 @@ type Period = { id: string; name: string };
 type Row = {
   id: string;
   title: string;
-  userId: string;
-  userName: string;
+  userId: string | null;
+  memberName: string | null;
+  displayName: string;
   userPhoto: string | null;
   periodId: string;
   status: "AKTIF" | "NONAKTIF";
@@ -90,7 +91,8 @@ export function PositionBoard({
                   positionId={p.id}
                   initial={{
                     title: p.title,
-                    userId: p.userId,
+                    userId: p.userId ?? "",
+                    memberName: p.memberName ?? "",
                     periodId: p.periodId,
                     status: p.status,
                     order: p.order,
@@ -114,16 +116,23 @@ export function PositionBoard({
               >
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-blue-100">
                   {p.userPhoto ? (
-                    <Image src={p.userPhoto} alt={p.userName} fill className="object-cover" />
+                    <Image src={p.userPhoto} alt={p.displayName} fill className="object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-brand">
-                      {p.userName.slice(0, 2).toUpperCase()}
+                      {p.displayName.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-slate-900">{p.title}</p>
-                  <p className="truncate text-sm text-slate-500">{p.userName}</p>
+                  <p className="truncate text-sm text-slate-500">
+                    {p.displayName}
+                    {!p.userId && (
+                      <span className="ml-1 rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700">
+                        belum ada akun
+                      </span>
+                    )}
+                  </p>
                 </div>
                 {canManage && (
                   <div className="flex shrink-0 flex-col gap-1">

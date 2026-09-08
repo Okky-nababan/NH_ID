@@ -166,19 +166,25 @@ model ManagementPeriod {
   positions Position[]
 }
 
+/// Jabatan dalam kepengurusan. TIDAK wajib terhubung ke akun anggota
+/// terdaftar — banyak nama di SK kepengurusan resmi belum tentu sudah
+/// mendaftar akun. Kalau `userId` kosong, `memberName` dipakai sebagai
+/// nama tampilan (diisi dari SK). Begitu orangnya mendaftar akun, admin
+/// bisa menghubungkan jabatannya ke akun tsb lewat `userId`.
 model Position {
-  id        String         @id @default(cuid())
-  title     String
-  userId    String
-  periodId  String
-  startDate DateTime?
-  endDate   DateTime?
-  status    PositionStatus @default(AKTIF)
-  order     Int            @default(0)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id         String         @id @default(cuid())
+  title      String
+  memberName String?
+  userId     String?
+  periodId   String
+  startDate  DateTime?
+  endDate    DateTime?
+  status     PositionStatus @default(AKTIF)
+  order      Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
-  user   User             @relation(fields: [userId], references: [id])
+  user   User?            @relation(fields: [userId], references: [id])
   period ManagementPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
   @@index([periodId])

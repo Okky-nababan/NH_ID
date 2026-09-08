@@ -34,7 +34,7 @@ export default async function Home() {
     ? await prisma.position.findMany({
         where: { periodId: activePeriod.id, status: "AKTIF" },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-        take: 6,
+        take: 8,
         include: { user: { select: { name: true, photoUrl: true } } },
       })
     : [];
@@ -123,23 +123,26 @@ export default async function Home() {
             </p>
             {positions.length > 0 ? (
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {positions.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-blue-100">
-                      {p.user.photoUrl ? (
-                        <Image src={p.user.photoUrl} alt={p.user.name} fill className="object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-brand">
-                          {p.user.name.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
+                {positions.map((p) => {
+                  const name = p.user?.name ?? p.memberName ?? "-";
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-blue-100">
+                        {p.user?.photoUrl ? (
+                          <Image src={p.user.photoUrl} alt={name} fill className="object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-brand">
+                            {name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{p.title}</p>
+                        <p className="text-sm text-slate-500">{name}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{p.title}</p>
-                      <p className="text-sm text-slate-500">{p.user.name}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="mt-4 text-sm text-slate-500">Struktur kepengurusan belum tersedia.</p>
