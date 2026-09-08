@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Logo } from "@/components/logo";
+import { Logo, HkbpLogo } from "@/components/logo";
 import { prisma } from "@/lib/prisma";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/labels";
 
@@ -44,6 +44,7 @@ export default async function Home() {
       <header className="bg-brand-darker">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
+            <HkbpLogo size={34} />
             <Logo size={38} withRing={false} />
             <span className="text-sm font-extrabold uppercase tracking-wide text-white sm:text-base">
               NHKBP Immanuel Dumai
@@ -69,7 +70,10 @@ export default async function Home() {
       <main className="flex-1">
         <section className="relative overflow-hidden bg-gradient-to-b from-brand-darker via-brand-dark to-brand">
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 py-16 text-center sm:px-6 sm:py-24">
-            <Logo size={96} />
+            <div className="flex items-center gap-4">
+              <HkbpLogo size={72} />
+              <Logo size={96} />
+            </div>
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-200">
                 Punguan Naposobulung HKBP Immanuel Dumai

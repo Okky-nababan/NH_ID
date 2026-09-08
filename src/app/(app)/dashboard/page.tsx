@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
@@ -44,7 +45,10 @@ async function MemberDashboard({ userId, name }: { userId: string; name: string 
 
   const [member, activePeriod, duesThisMonth, upcomingActivity, lastPayment, lastAttendance, attendances] =
     await Promise.all([
-      prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+      // findUnique (bukan findUniqueOrThrow): sesi JWT bisa saja masih hidup
+      // untuk akun yang sudah dihapus/dinonaktifkan admin — redirect ke
+      // login dengan mulus, bukan crash ke halaman error.
+      prisma.user.findUnique({ where: { id: userId } }),
       prisma.managementPeriod.findFirst({ where: { isActive: true } }),
       prisma.cashPayment.findFirst({
         where: { userId, month: now.getMonth() + 1, year: now.getFullYear() },
@@ -64,6 +68,8 @@ async function MemberDashboard({ userId, name }: { userId: string; name: string 
       }),
       prisma.attendance.findMany({ where: { userId } }),
     ]);
+
+  if (!member) redirect("/login");
 
   const hadirCount = attendances.filter((a) => a.status === "HADIR").length;
   const attendancePct = attendances.length > 0 ? Math.round((hadirCount / attendances.length) * 100) : 0;

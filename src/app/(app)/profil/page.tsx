@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Tabs } from "@/components/tabs";
@@ -14,7 +15,10 @@ export default async function ProfilPage() {
   const userId = session!.user.id;
 
   const [user, payments, attendances, positions] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+    // findUnique (bukan findUniqueOrThrow): sesi JWT bisa saja masih hidup
+    // untuk akun yang sudah dihapus/dinonaktifkan admin — redirect ke
+    // login dengan mulus, bukan crash ke halaman error.
+    prisma.user.findUnique({ where: { id: userId } }),
     prisma.cashPayment.findMany({
       where: { userId },
       orderBy: [{ year: "desc" }, { month: "desc" }],
@@ -32,6 +36,8 @@ export default async function ProfilPage() {
       orderBy: { createdAt: "desc" },
     }),
   ]);
+
+  if (!user) redirect("/login");
 
   const tabs = [
     {

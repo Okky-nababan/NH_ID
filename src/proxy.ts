@@ -26,5 +26,12 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|uploads).*)"],
+  // Kecualikan API, internal Next.js, folder /uploads, DAN file statis apa
+  // pun di public/ (logo, favicon, dll — dikenali dari ekstensi file) dari
+  // pengecekan login. Tanpa ini, aset publik seperti logo ikut diblokir
+  // untuk pengunjung yang belum login, karena path-nya tidak persis "/",
+  // "/login", atau "/register".
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|uploads|.*\\.(?:png|jpg|jpeg|webp|svg|gif|ico)$).*)",
+  ],
 };
