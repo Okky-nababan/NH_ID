@@ -50,3 +50,6 @@ next-env.d.ts
 # uploads
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# data pribadi anggota (mentah, belum diproses) — jangan pernah di-commit/push
+/data/
