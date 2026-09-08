@@ -22,12 +22,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Situs ini sengaja didesain dengan satu tema (biru terang) — semua
+   komponen pakai warna hardcoded (bg-white, text-slate-900, dst.), bukan
+   token yang bisa berubah. Karena itu TIDAK ada override
+   prefers-color-scheme: dark di sini (beda dengan bawaan create-next-app) —
+   supaya konsisten untuk semua pengguna, apapun setelan tema perangkatnya. */
 
 body {
   background: var(--background);
