@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { QueryParamSelect } from "@/components/query-param-select";
 import { CashPaymentList } from "./cash-payment-list";
 import { TransactionSection } from "./transaction-section";
+import { SyncButton } from "./sync-button";
 
 function formatDateInput(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -26,7 +27,7 @@ export default async function KasPage({
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [payments, transactions, members] = await Promise.all([
+  const [payments, transactions, members, treasury] = await Promise.all([
     prisma.cashPayment.findMany({
       orderBy: [{ year: "desc" }, { month: "desc" }],
       include: { user: { select: { name: true } } },
@@ -42,17 +43,29 @@ export default async function KasPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    prisma.treasurySummary.findUnique({ where: { id: "main" } }),
   ]);
 
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   return (
     <div className="space-y-10">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Uang Kas</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Pencatatan iuran bulanan anggota dan ledger organisasi.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Uang Kas</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Pencatatan iuran bulanan anggota dan ledger organisasi.
+          </p>
+          {treasury && (
+            <p className="mt-1 text-xs text-slate-400">
+              Terakhir sinkron dari spreadsheet:{" "}
+              {new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(
+                treasury.syncedAt
+              )}
+            </p>
+          )}
+        </div>
+        {canManage && <SyncButton />}
       </div>
 
       <section>

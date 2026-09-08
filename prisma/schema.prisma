@@ -268,9 +268,28 @@ model Transaction {
   description String?
   date        DateTime
   userId      String?
+  /// true = dibuat otomatis oleh sinkronisasi spreadsheet Bendahara (akan
+  /// ditimpa ulang tiap sinkron). false = ditambahkan manual lewat web —
+  /// TIDAK PERNAH dihapus/ditimpa oleh proses sinkronisasi.
+  syncedFromSheet Boolean     @default(false)
   createdAt   DateTime        @default(now())
 
   user User? @relation(fields: [userId], references: [id])
+
+  @@index([syncedFromSheet])
+}
+
+/// Ringkasan saldo kas resmi versi Bendahara (tab "Total Keuangan" di
+/// spreadsheet) — sengaja disimpan TERPISAH dari total hasil hitung ledger
+/// rinci, karena catatan rinci bisa saja belum lengkap untuk bulan-bulan
+/// terbaru. Hanya ada 1 baris (singleton, id tetap "main").
+model TreasurySummary {
+  id              String   @id @default("main")
+  saldoResmi      Int
+  asOfLabel       String
+  cumAmount       Int
+  bendaharaAmount Int
+  syncedAt        DateTime @default(now())
 }
 
 // ============ Partitur Koor ============

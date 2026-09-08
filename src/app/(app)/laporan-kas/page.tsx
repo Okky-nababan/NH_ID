@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissions";
 import { MONTH_NAMES_ID } from "@/lib/constants";
 import { QueryParamSelect } from "@/components/query-param-select";
 import { PrintButton } from "./print-button";
+import { SyncButton } from "../kas/sync-button";
 
 function formatRupiah(amount: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -32,13 +33,14 @@ export default async function LaporanKasPage({
 }) {
   const session = await auth();
   if (!hasPermission(session, "VIEW_CASH_REPORT")) redirect("/kas-saya");
+  const canManage = hasPermission(session, "MANAGE_CASH_PAYMENT");
 
   const { year: yearParam } = await searchParams;
   const year = Number(yearParam) || new Date().getFullYear();
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [activeMembers, payments, yearTx, saldoAwalAgg] = await Promise.all([
+  const [activeMembers, payments, yearTx, saldoAwalAgg, allTimeAgg, treasury] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
     prisma.cashPayment.findMany({ where: { year } }),
     prisma.transaction.findMany({
@@ -51,7 +53,15 @@ export default async function LaporanKasPage({
       where: { date: { lt: yearStart } },
       _sum: { amount: true },
     }),
+    // Saldo dari SELURUH riwayat transaksi (semua tahun) — dibandingkan
+    // transparan dengan saldo resmi versi Bendahara di bawah.
+    prisma.transaction.groupBy({ by: ["type"], _sum: { amount: true } }),
+    prisma.treasurySummary.findUnique({ where: { id: "main" } }),
   ]);
+
+  const saldoLedgerKeseluruhan =
+    (allTimeAgg.find((a) => a.type === "MASUK")?._sum.amount ?? 0) -
+    (allTimeAgg.find((a) => a.type === "KELUAR")?._sum.amount ?? 0);
 
   const saldoAwal =
     (saldoAwalAgg.find((a) => a.type === "MASUK")?._sum.amount ?? 0) -
@@ -113,7 +123,8 @@ export default async function LaporanKasPage({
           <h1 className="text-2xl font-bold text-slate-900">Laporan Uang Kas</h1>
           <p className="mt-1 text-sm text-slate-500">Rekapitulasi keuangan tahun {year}.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canManage && <SyncButton />}
           <QueryParamSelect
             paramName="year"
             fallback={String(year)}
@@ -135,6 +146,41 @@ export default async function LaporanKasPage({
         <p className="text-sm">Tahun {year}</p>
       </div>
 
+      {/* Saldo resmi versi Bendahara (dari tab "Total Keuangan" spreadsheet) —
+          ditampilkan apa adanya, TIDAK dipaksa sama dengan hasil hitung
+          ledger rinci di bawah. Kalau beda, kemungkinan besar karena
+          transaksi bulan-bulan terbaru belum sempat ditulis rinci di sheet
+          "Rekapitulasi <tahun>" (wajar untuk pembukuan yang masih berjalan). */}
+      {treasury && (
+        <div className="rounded-lg border-2 border-brand bg-blue-50 p-5 print:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-brand-darker">
+                Saldo Kas Saat Ini <span className="font-normal">(versi Bendahara, per {treasury.asOfLabel})</span>
+              </p>
+              <p className="mt-1 text-2xl font-bold text-brand-darker">
+                {formatRupiah(treasury.saldoResmi)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Cum HKBP Immanuel: {formatRupiah(treasury.cumAmount)} &middot; Dipegang Bendahara:{" "}
+                {formatRupiah(treasury.bendaharaAmount)}
+              </p>
+            </div>
+            {saldoLedgerKeseluruhan !== treasury.saldoResmi && (
+              <div className="max-w-xs rounded-md bg-white/60 p-3 text-xs text-slate-600">
+                <p className="font-medium text-slate-700">
+                  Saldo dari rincian transaksi tercatat: {formatRupiah(saldoLedgerKeseluruhan)}
+                </p>
+                <p className="mt-1">
+                  Selisih {formatRupiah(Math.abs(treasury.saldoResmi - saldoLedgerKeseluruhan))} kemungkinan
+                  karena transaksi bulan terbaru belum ditulis rinci di sheet Rekapitulasi.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Ringkasan utama: saldo awal -> pemasukan/pengeluaran -> saldo akhir,
           urutan yang sama dengan cara pembukuan manual biasa dibaca. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -150,9 +196,9 @@ export default async function LaporanKasPage({
           <p className="text-sm text-slate-500">Total Pengeluaran</p>
           <p className="mt-2 text-xl font-bold text-red-600">{formatRupiah(totalExpense)}</p>
         </div>
-        <div className="rounded-lg border-2 border-brand bg-blue-50 p-5">
-          <p className="text-sm font-medium text-brand-darker">Saldo Akhir {year}</p>
-          <p className="mt-2 text-xl font-bold text-brand-darker">{formatRupiah(saldoAkhir)}</p>
+        <div className="rounded-lg border-2 border-slate-300 bg-slate-50 p-5">
+          <p className="text-sm font-medium text-slate-600">Saldo Akhir {year} (rincian tercatat)</p>
+          <p className="mt-2 text-xl font-bold text-slate-900">{formatRupiah(saldoAkhir)}</p>
         </div>
       </div>
 
