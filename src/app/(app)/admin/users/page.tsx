@@ -1,9 +1,13 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/permissions";
 import { UserTable } from "./user-table";
 
 export default async function AdminUsersPage() {
   const session = await auth();
+  if (!hasPermission(session, "MANAGE_USERS")) redirect("/dashboard");
+
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "asc" },
     select: {

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AnnouncementAdmin } from "./announcement-admin";
 
@@ -8,6 +10,11 @@ function formatDate(date: Date) {
 }
 
 export default async function AdminPengumumanPage() {
+  // Tidak ada izin granular untuk pengumuman -- khusus role ADMIN, sama
+  // seperti aturan di api/posts/route.ts (POST/PATCH tipe PENGUMUMAN).
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") redirect("/dashboard");
+
   const posts = await prisma.post.findMany({
     where: { type: "PENGUMUMAN" },
     orderBy: { createdAt: "desc" },

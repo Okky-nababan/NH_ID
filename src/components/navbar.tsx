@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Logo } from "@/components/logo";
+import { ADMIN_SECTION_PERMISSIONS } from "@/lib/permissions";
 import type { Permission, Role } from "@/generated/prisma/client";
 
 type NavLink = { href: string; label: string; permission?: Permission };
@@ -61,8 +62,18 @@ export function Navbar({
 
   const baseLinks = role === "ANGGOTA" ? MEMBER_LINKS : MANAGE_LINKS;
   const visibleLinks = baseLinks.filter(canSee);
-  const allLinks: NavLink[] =
-    role === "ADMIN" ? [...visibleLinks, { href: "/admin/users", label: "Admin" }] : visibleLinks;
+  // "Admin" tampil untuk ADMIN, dan untuk Pengurus yang diberi salah satu
+  // izin granular terkait admin (MANAGE_USERS, MANAGE_MEMBERS,
+  // VIEW_AUDIT_LOG) -- sebelumnya cuma role ADMIN yang lihat link ini,
+  // jadi Pengurus yang sudah diberi izin itu tidak pernah punya jalan
+  // masuk ke halamannya sama sekali (lihat admin/layout.tsx & page.tsx
+  // masing-masing untuk gate izinnya). "/admin" mengarahkan otomatis ke
+  // sub-halaman pertama yang memang bisa diakses user ini.
+  const canSeeAdminSection =
+    role === "ADMIN" || ADMIN_SECTION_PERMISSIONS.some((p) => permissions.includes(p));
+  const allLinks: NavLink[] = canSeeAdminSection
+    ? [...visibleLinks, { href: "/admin", label: "Admin" }]
+    : visibleLinks;
 
   return (
     <header className="bg-brand-darker shadow-md">

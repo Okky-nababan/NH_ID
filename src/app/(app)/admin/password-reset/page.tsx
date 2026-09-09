@@ -1,7 +1,13 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/permissions";
 import { PasswordResetTable } from "./password-reset-table";
 
 export default async function AdminPasswordResetPage() {
+  const session = await auth();
+  if (!hasPermission(session, "MANAGE_USERS")) redirect("/dashboard");
+
   const requests = await prisma.passwordResetRequest.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,

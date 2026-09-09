@@ -1,7 +1,13 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/permissions";
 import { ProfileEditRequestTable } from "./profile-edit-request-table";
 
 export default async function AdminProfileEditRequestsPage() {
+  const session = await auth();
+  if (!hasPermission(session, "MANAGE_MEMBERS")) redirect("/dashboard");
+
   const requests = await prisma.profileEditRequest.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,

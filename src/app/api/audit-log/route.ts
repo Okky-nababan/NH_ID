@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/api-auth";
+import { requirePermission } from "@/lib/api-auth";
 
 export async function GET() {
-  const { error } = await requireAdmin();
+  const { error } = await requirePermission(
+    "VIEW_AUDIT_LOG",
+    "Anda tidak memiliki izin untuk melihat audit log."
+  );
   if (error) return error;
 
   const logs = await prisma.auditLog.findMany({

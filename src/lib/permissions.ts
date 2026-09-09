@@ -20,6 +20,20 @@ export function hasPermission(
   return session.user.permissions.includes(permission);
 }
 
+/**
+ * Izin granular yang membuka akses ke minimal satu sub-halaman /admin/*
+ * untuk Pengurus (bukan cuma ADMIN) -- dipakai bareng oleh proxy.ts
+ * (gerbang route) dan navbar.tsx (tampil/sembunyikan link "Admin"), supaya
+ * keduanya selalu sinkron dengan gate per-halaman yang sebenarnya
+ * (admin/layout.tsx & masing-masing page.tsx). Pengumuman sengaja tidak
+ * termasuk -- tidak ada izin granular untuknya, khusus ADMIN.
+ */
+export const ADMIN_SECTION_PERMISSIONS: Permission[] = [
+  "MANAGE_USERS",
+  "MANAGE_MEMBERS",
+  "VIEW_AUDIT_LOG",
+];
+
 export const PERMISSION_LABELS: Record<Permission, string> = {
   MANAGE_MEMBERS: "Kelola Data Anggota",
   MANAGE_ACTIVITIES: "Kelola Kegiatan",

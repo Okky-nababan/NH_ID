@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/permissions";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(
@@ -18,6 +21,9 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 export default async function AuditLogPage() {
+  const session = await auth();
+  if (!hasPermission(session, "VIEW_AUDIT_LOG")) redirect("/dashboard");
+
   const logs = await prisma.auditLog.findMany({
     orderBy: { createdAt: "desc" },
     take: 300,
