@@ -9,6 +9,7 @@ export default async function PeriodePage() {
 
   const periods = await prisma.managementPeriod.findMany({
     orderBy: { startYear: "desc" },
+    include: { _count: { select: { positions: true } } },
   });
 
   return (
@@ -27,6 +28,7 @@ export default async function PeriodePage() {
             endYear: p.endYear,
             isActive: p.isActive,
             notes: p.notes ?? "",
+            positionCount: p._count.positions,
           }))}
           canManage={canManage}
         />

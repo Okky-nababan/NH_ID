@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/api-auth";
+import { requireUser } from "@/lib/api-auth";
 import { MONTH_NAMES_ID } from "@/lib/constants";
 
+/**
+ * Export CSV Laporan Kas berisi data yang SAMA dengan yang sudah tampil di
+ * layar /laporan-kas -- halaman itu sengaja dibuka untuk SEMUA anggota
+ * (transparansi keuangan, lihat page.tsx), jadi export-nya juga hanya
+ * butuh login, bukan izin VIEW_CASH_REPORT (sebelumnya beda kebijakan
+ * dengan halamannya sendiri -- tombol Export tampil untuk semua anggota
+ * tapi ditolak 403 di sini).
+ */
 export async function GET(request: Request) {
-  const { error } = await requirePermission(
-    "VIEW_CASH_REPORT",
-    "Anda tidak memiliki izin untuk melihat laporan kas."
-  );
+  const { error } = await requireUser();
   if (error) return error;
 
   const { searchParams } = new URL(request.url);

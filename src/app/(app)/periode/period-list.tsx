@@ -11,6 +11,7 @@ type Row = {
   endYear: number;
   isActive: boolean;
   notes: string;
+  positionCount: number;
 };
 
 export function PeriodList({ periods, canManage }: { periods: Row[]; canManage: boolean }) {
@@ -19,10 +20,17 @@ export function PeriodList({ periods, canManage }: { periods: Row[]; canManage: 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const remove = async (id: string) => {
-    if (!confirm("Hapus periode ini?")) return;
-    setBusyId(id);
-    const res = await fetch(`/api/periods/${id}`, { method: "DELETE" });
+  const remove = async (period: Row) => {
+    // Menghapus periode ikut menghapus SEMUA data jabatan/kepengurusan yang
+    // terhubung ke periode ini (relasi cascade) -- peringatkan jumlahnya
+    // secara eksplisit supaya tidak ada yang terhapus tanpa sadar.
+    const message =
+      period.positionCount > 0
+        ? `Periode "${period.name}" ini punya ${period.positionCount} data jabatan/kepengurusan. Menghapus periode akan ikut MENGHAPUS PERMANEN seluruh ${period.positionCount} data jabatan tersebut. Lanjutkan?`
+        : `Hapus periode "${period.name}"? Periode ini belum punya data jabatan terhubung.`;
+    if (!confirm(message)) return;
+    setBusyId(period.id);
+    const res = await fetch(`/api/periods/${period.id}`, { method: "DELETE" });
     setBusyId(null);
     if (res.ok) router.refresh();
   };
@@ -97,7 +105,7 @@ export function PeriodList({ periods, canManage }: { periods: Row[]; canManage: 
                   )}
                 </div>
                 <p className="text-sm text-slate-500">
-                  {p.startYear} - {p.endYear}
+                  {p.startYear} - {p.endYear} &middot; {p.positionCount} jabatan
                 </p>
                 {p.notes && <p className="mt-1 text-sm text-slate-500">{p.notes}</p>}
               </div>
@@ -111,7 +119,7 @@ export function PeriodList({ periods, canManage }: { periods: Row[]; canManage: 
                   </button>
                   <button
                     disabled={busyId === p.id}
-                    onClick={() => remove(p.id)}
+                    onClick={() => remove(p)}
                     className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                   >
                     Hapus
