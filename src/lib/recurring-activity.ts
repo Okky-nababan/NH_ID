@@ -14,11 +14,13 @@ const ROUTINE_SCHEDULE = [
     weekday: 2, // Selasa
     name: "Persekutuan Rutin Selasa",
     hourWIB: 19,
+    minuteWIB: 30,
   },
   {
     weekday: 5, // Jumat
     name: "Persekutuan Rutin Jumat",
     hourWIB: 19,
+    minuteWIB: 30,
   },
 ] as const;
 
@@ -27,9 +29,9 @@ const ROUTINE_DESCRIPTION =
 
 const DEFAULT_LOCATION = "Gedung Gereja HKBP Immanuel Dumai";
 
-function wibHourToUtc(dayUtcMidnight: Date, hourWIB: number): Date {
+function wibTimeToUtc(dayUtcMidnight: Date, hourWIB: number, minuteWIB: number): Date {
   const date = new Date(dayUtcMidnight);
-  date.setUTCHours(hourWIB - 7, 0, 0, 0);
+  date.setUTCHours(hourWIB - 7, minuteWIB, 0, 0);
   return date;
 }
 
@@ -49,10 +51,10 @@ async function resolveSystemCreatorId(): Promise<string | null> {
 
 /**
  * Pastikan setiap Selasa & Jumat mulai `startDate` (default: hari ini)
- * sampai `daysAhead` hari sesudahnya sudah punya kegiatan rutin di
- * database. Idempotent -- tanggal yang sudah punya kegiatan
- * `isRoutine: true` dilewati, tidak dibuat dobel. Aman dipanggil berkali-
- * kali (manual maupun cron harian).
+ * sampai `endDate` (atau `daysAhead` hari sesudah startDate kalau endDate
+ * tidak diisi) sudah punya kegiatan rutin di database. Idempotent --
+ * tanggal yang sudah punya kegiatan `isRoutine: true` dilewati, tidak
+ * dibuat dobel. Aman dipanggil berkali-kali (manual maupun cron harian).
  *
  * `startDate` boleh tanggal di masa lalu -- dipakai untuk menutup jadwal
  * rutin yang belum sempat dibuat sebelum fitur ini ada (mis. anggota minta
@@ -61,11 +63,14 @@ async function resolveSystemCreatorId(): Promise<string | null> {
 export async function ensureRoutineActivities({
   createdById,
   startDate,
+  endDate,
   daysAhead = 60,
 }: {
   createdById?: string;
   /** Tanggal awal (WIB) generator mulai mengisi jadwal. Default: hari ini. */
   startDate?: Date;
+  /** Tanggal akhir (WIB, inklusif). Kalau diisi, menggantikan `daysAhead`. */
+  endDate?: Date;
   daysAhead?: number;
 } = {}): Promise<{ created: number; createdDates: string[]; skippedNoCreator: boolean }> {
   const actorId = createdById ?? (await resolveSystemCreatorId());
@@ -76,9 +81,19 @@ export async function ensureRoutineActivities({
   const startUtcMidnight = startDate ? new Date(startDate) : new Date();
   startUtcMidnight.setUTCHours(0, 0, 0, 0);
 
+  let totalDays = daysAhead;
+  if (endDate) {
+    const endUtcMidnight = new Date(endDate);
+    endUtcMidnight.setUTCHours(0, 0, 0, 0);
+    const diffDays = Math.round(
+      (endUtcMidnight.getTime() - startUtcMidnight.getTime()) / (24 * 60 * 60 * 1000)
+    );
+    totalDays = Math.max(0, diffDays) + 1; // inklusif endDate
+  }
+
   const createdDates: string[] = [];
 
-  for (let i = 0; i < daysAhead; i++) {
+  for (let i = 0; i < totalDays; i++) {
     const day = new Date(startUtcMidnight);
     day.setUTCDate(day.getUTCDate() + i);
     const weekday = day.getUTCDay();
@@ -100,7 +115,7 @@ export async function ensureRoutineActivities({
         name: schedule.name,
         type: "PERSEKUTUAN",
         description: ROUTINE_DESCRIPTION,
-        date: wibHourToUtc(day, schedule.hourWIB),
+        date: wibTimeToUtc(day, schedule.hourWIB, schedule.minuteWIB),
         location: DEFAULT_LOCATION,
         status: "DIRENCANAKAN",
         isRoutine: true,
@@ -108,7 +123,11 @@ export async function ensureRoutineActivities({
       },
     });
     createdDates.push(
-      new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeZone: "UTC" }).format(activity.date)
+      new Intl.DateTimeFormat("id-ID", {
+        dateStyle: "full",
+        timeStyle: "short",
+        timeZone: "Asia/Jakarta",
+      }).format(activity.date)
     );
   }
 
