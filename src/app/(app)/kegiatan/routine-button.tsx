@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 export function RoutineButton() {
   const router = useRouter();
+  const [startDate, setStartDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -13,7 +14,11 @@ export function RoutineButton() {
     setMessage(null);
     setIsError(false);
     setLoading(true);
-    const res = await fetch("/api/activities/routine", { method: "POST" });
+    const res = await fetch("/api/activities/routine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(startDate ? { startDate } : {}),
+    });
     const body = await res.json().catch(() => ({}));
     setLoading(false);
 
@@ -25,26 +30,35 @@ export function RoutineButton() {
 
     setMessage(
       body.created > 0
-        ? `${body.created} jadwal Selasa/Jumat berhasil dibuat untuk 60 hari ke depan.`
-        : "Jadwal Selasa/Jumat untuk 60 hari ke depan sudah lengkap, tidak ada yang perlu ditambahkan."
+        ? `${body.created} jadwal Selasa/Jumat berhasil dibuat.`
+        : "Tidak ada jadwal baru yang perlu ditambahkan pada rentang ini."
     );
     router.refresh();
   };
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={onGenerate}
-        disabled={loading}
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-        title="Isi otomatis jadwal persekutuan rutin Selasa & Jumat yang belum ada, supaya tidak ada yang ketinggalan"
-      >
-        {loading ? "Membuat jadwal..." : "Buat Jadwal Rutin"}
-      </button>
-      {message && (
-        <p className={`mt-1 text-xs ${isError ? "text-red-600" : "text-green-600"}`}>{message}</p>
-      )}
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        title="Mulai dari tanggal (opsional, kosongkan untuk mulai hari ini)"
+        className="rounded-md border border-slate-300 px-2 py-2 text-sm"
+      />
+      <div>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={loading}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          title="Isi otomatis jadwal persekutuan rutin Selasa & Jumat (60 hari ke depan dari tanggal mulai) yang belum ada, supaya tidak ada yang ketinggalan"
+        >
+          {loading ? "Membuat jadwal..." : "Buat Jadwal Rutin"}
+        </button>
+        {message && (
+          <p className={`mt-1 text-xs ${isError ? "text-red-600" : "text-green-600"}`}>{message}</p>
+        )}
+      </div>
     </div>
   );
 }

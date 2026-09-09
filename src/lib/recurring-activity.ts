@@ -48,16 +48,24 @@ async function resolveSystemCreatorId(): Promise<string | null> {
 }
 
 /**
- * Pastikan setiap Selasa & Jumat dalam rentang `daysAhead` hari ke depan
- * (dari hari ini) sudah punya kegiatan rutin di database. Idempotent --
- * tanggal yang sudah punya kegiatan `isRoutine: true` dilewati, tidak
- * dibuat dobel. Aman dipanggil berkali-kali (manual maupun cron harian).
+ * Pastikan setiap Selasa & Jumat mulai `startDate` (default: hari ini)
+ * sampai `daysAhead` hari sesudahnya sudah punya kegiatan rutin di
+ * database. Idempotent -- tanggal yang sudah punya kegiatan
+ * `isRoutine: true` dilewati, tidak dibuat dobel. Aman dipanggil berkali-
+ * kali (manual maupun cron harian).
+ *
+ * `startDate` boleh tanggal di masa lalu -- dipakai untuk menutup jadwal
+ * rutin yang belum sempat dibuat sebelum fitur ini ada (mis. anggota minta
+ * kegiatan mulai dari tanggal tertentu yang sudah lewat).
  */
 export async function ensureRoutineActivities({
   createdById,
+  startDate,
   daysAhead = 60,
 }: {
   createdById?: string;
+  /** Tanggal awal (WIB) generator mulai mengisi jadwal. Default: hari ini. */
+  startDate?: Date;
   daysAhead?: number;
 } = {}): Promise<{ created: number; createdDates: string[]; skippedNoCreator: boolean }> {
   const actorId = createdById ?? (await resolveSystemCreatorId());
@@ -65,13 +73,13 @@ export async function ensureRoutineActivities({
     return { created: 0, createdDates: [], skippedNoCreator: true };
   }
 
-  const todayUtcMidnight = new Date();
-  todayUtcMidnight.setUTCHours(0, 0, 0, 0);
+  const startUtcMidnight = startDate ? new Date(startDate) : new Date();
+  startUtcMidnight.setUTCHours(0, 0, 0, 0);
 
   const createdDates: string[] = [];
 
   for (let i = 0; i < daysAhead; i++) {
-    const day = new Date(todayUtcMidnight);
+    const day = new Date(startUtcMidnight);
     day.setUTCDate(day.getUTCDate() + i);
     const weekday = day.getUTCDay();
 
