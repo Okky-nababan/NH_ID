@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+/**
+ * Biodata dikumpulkan LENGKAP saat daftar, karena setelah ini anggota
+ * tidak bisa mengedit sendiri (hanya Admin/Pengurus yang bisa, lewat
+ * permintaan edit) -- lihat memberSchema & ProfileEditRequest.
+ */
 export const registerSchema = z.object({
   name: z.string().trim().min(2, "Nama minimal 2 karakter"),
   email: z.string().trim().toLowerCase().email("Email tidak valid"),
@@ -9,6 +14,11 @@ export const registerSchema = z.object({
     .min(9, "Nomor HP minimal 9 digit")
     .regex(/^[0-9+\-\s]+$/, "Nomor HP hanya boleh berisi angka"),
   password: z.string().min(8, "Password minimal 8 karakter"),
+  gender: z.enum(["LAKI_LAKI", "PEREMPUAN"], { message: "Jenis kelamin wajib dipilih" }),
+  birthPlace: z.string().trim().min(2, "Tempat lahir wajib diisi").max(100),
+  birthDate: z.string().min(1, "Tanggal lahir wajib diisi"),
+  address: z.string().trim().min(3, "Alamat wajib diisi").max(255),
+  motherClan: z.string().trim().max(100).optional().or(z.literal("")),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 

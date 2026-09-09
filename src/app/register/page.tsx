@@ -121,6 +121,78 @@ export default function RegisterPage() {
             )}
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Jenis Kelamin
+              </label>
+              <select
+                {...register("gender")}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              >
+                <option value="">- Pilih -</option>
+                <option value="LAKI_LAKI">Laki-laki</option>
+                <option value="PEREMPUAN">Perempuan</option>
+              </select>
+              {errors.gender && (
+                <p className="mt-1 text-sm text-red-600">{errors.gender.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Tanggal Lahir
+              </label>
+              <input
+                type="date"
+                {...register("birthDate")}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+              {errors.birthDate && (
+                <p className="mt-1 text-sm text-red-600">{errors.birthDate.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Tempat Lahir
+            </label>
+            <input
+              type="text"
+              {...register("birthPlace")}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+            {errors.birthPlace && (
+              <p className="mt-1 text-sm text-red-600">{errors.birthPlace.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Alamat
+            </label>
+            <input
+              type="text"
+              {...register("address")}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+            {errors.address && (
+              <p className="mt-1 text-sm text-red-600">{errors.address.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Tubu/Boru ni Mama (Marga Ibu) — opsional
+            </label>
+            <input
+              type="text"
+              placeholder="Mis. Boru Sihombing"
+              {...register("motherClan")}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+          </div>
+
           {formError && <p className="text-sm text-red-600">{formError}</p>}
 
           <button

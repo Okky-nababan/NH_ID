@@ -5,6 +5,7 @@ import { Tabs } from "@/components/tabs";
 import { MONTH_NAMES_ID } from "@/lib/constants";
 import { ATTENDANCE_STATUS_LABELS, CASH_STATUS_LABELS, CASH_STATUS_CLASS } from "@/lib/labels";
 import { ProfileInfo } from "./profile-info";
+import { PhotoUploadForm } from "./photo-upload-form";
 import { ChangePasswordForm } from "./change-password-form";
 import { EditRequestForm } from "./edit-request-form";
 
@@ -53,15 +54,17 @@ export default async function ProfilPage() {
       content: (
         <div className="space-y-6">
           <div className="rounded-lg border border-slate-200 bg-white p-6">
-            <ProfileInfo
-              name={user.name}
-              phone={user.phone}
-              address={user.address ?? ""}
-              birthPlace={user.birthPlace ?? ""}
-              birthDate={user.birthDate}
-              motherClan={user.motherClan ?? ""}
-              photoUrl={user.photoUrl ?? ""}
-            />
+            <PhotoUploadForm name={user.name} initialPhotoUrl={user.photoUrl ?? ""} />
+            <div className="mt-5">
+              <ProfileInfo
+                name={user.name}
+                phone={user.phone}
+                address={user.address ?? ""}
+                birthPlace={user.birthPlace ?? ""}
+                birthDate={user.birthDate}
+                motherClan={user.motherClan ?? ""}
+              />
+            </div>
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-white p-6">

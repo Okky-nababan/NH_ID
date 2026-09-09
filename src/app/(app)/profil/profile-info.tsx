@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: "UTC" }).format(date);
 }
@@ -11,16 +9,16 @@ type Props = {
   birthPlace: string;
   birthDate: Date | null;
   motherClan: string;
-  photoUrl: string;
 };
 
 /**
  * Biodata anggota -- READ ONLY. Anggota tidak berhak mengedit langsung;
  * lihat edit-request-form.tsx untuk cara mengajukan perubahan ke
- * Admin/Pengurus, dan change-password-form.tsx untuk satu-satunya hal
- * yang boleh anggota ubah sendiri (password).
+ * Admin/Pengurus. Pengecualian: password (change-password-form.tsx) dan
+ * foto profil (photo-upload-form.tsx) -- keduanya boleh anggota ubah
+ * sendiri tanpa persetujuan.
  */
-export function ProfileInfo({ name, phone, address, birthPlace, birthDate, motherClan, photoUrl }: Props) {
+export function ProfileInfo({ name, phone, address, birthPlace, birthDate, motherClan }: Props) {
   const rows: { label: string; value: string }[] = [
     { label: "Nama Lengkap", value: name },
     { label: "Nomor HP", value: phone },
@@ -34,21 +32,10 @@ export function ProfileInfo({ name, phone, address, birthPlace, birthDate, mothe
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-4">
-        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-blue-100">
-          {photoUrl ? (
-            <Image src={photoUrl} alt="Foto profil" fill className="object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-blue-700">
-              {name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-        </div>
-        <p className="text-sm text-slate-500">
-          Biodata di bawah dikelola oleh Admin/Pengurus. Kalau ada yang perlu diperbaiki
-          (termasuk foto profil), ajukan permintaan lewat form di bagian bawah halaman ini.
-        </p>
-      </div>
+      <p className="text-sm text-slate-500">
+        Biodata di bawah dikelola oleh Admin/Pengurus. Kalau ada yang perlu diperbaiki, ajukan
+        permintaan lewat form di bagian bawah halaman ini.
+      </p>
 
       <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {rows.map((r) => (
