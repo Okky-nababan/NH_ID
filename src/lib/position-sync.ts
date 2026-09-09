@@ -10,29 +10,36 @@ import { prisma } from "@/lib/prisma";
  * Admin mengedit manual satu-satu.
  */
 
-/** Normalisasi nama untuk pencocokan longgar -- huruf kecil semua, spasi
- * ganda dirapikan -- supaya "Okky Alexander Nababan" tetap cocok dengan
- * "okky  alexander nababan" (beda kapitalisasi/spasi). */
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
+/**
+ * Kunci pencocokan nama: SENGAJA cuma 2 kata pertama (nama depan), bukan
+ * nama lengkap -- di lapangan, nama di daftar Kepengurusan sering beda
+ * marga/nama belakang dengan nama di akun anggota (mis. "Marlina Olivia
+ * Sihombing" di Kepengurusan vs "Marlina Olivia Lumban Toruan" di akun),
+ * jadi 2 kata pertama sudah cukup untuk mencocokkan orangnya. Huruf kecil
+ * semua + spasi ganda dirapikan supaya beda kapitalisasi/spasi tidak
+ * menggagalkan pencocokan.
+ */
+function matchKey(name: string): string {
+  const words = name.trim().toLowerCase().replace(/\s+/g, " ").split(" ").filter(Boolean);
+  return words.slice(0, 2).join(" ");
 }
 
 /**
  * Dipanggil setiap ada anggota baru terdaftar (lewat /api/register atau
  * /api/members). Cari jabatan yang belum terhubung ke akun mana pun tapi
- * `memberName`-nya cocok dengan nama anggota baru ini, lalu hubungkan.
- * Tidak pernah melempar error ke pemanggil -- kegagalan di sini tidak
- * boleh menggagalkan pendaftaran anggota.
+ * `memberName`-nya cocok (2 kata pertama) dengan nama anggota baru ini,
+ * lalu hubungkan. Tidak pernah melempar error ke pemanggil -- kegagalan di
+ * sini tidak boleh menggagalkan pendaftaran anggota.
  */
 export async function linkPositionsForNewUser(userId: string, userName: string): Promise<number> {
   try {
-    const target = normalizeName(userName);
+    const target = matchKey(userName);
     const unlinked = await prisma.position.findMany({
       where: { userId: null, memberName: { not: null } },
       select: { id: true, memberName: true },
     });
     const matchIds = unlinked
-      .filter((p) => p.memberName && normalizeName(p.memberName) === target)
+      .filter((p) => p.memberName && matchKey(p.memberName) === target)
       .map((p) => p.id);
     if (matchIds.length === 0) return 0;
 
@@ -51,11 +58,12 @@ export type BackfillResult = { linked: number; details: string[] };
 
 /**
  * Backfill sekali jalan: cocokkan SEMUA jabatan yang belum terhubung
- * terhadap SEMUA akun anggota yang sudah terdaftar. Dipakai untuk
- * memperbaiki data lama (anggota yang sudah lebih dulu daftar sebelum
- * jabatannya dicatat, atau dicatat manual dengan nama yang belum
- * di-link) -- dipicu lewat tombol "Sinkronkan Nama dengan Anggota" di
- * halaman Kepengurusan, atau lewat script sekali jalan.
+ * terhadap SEMUA akun anggota yang sudah terdaftar (2 kata nama pertama).
+ * Dipakai untuk memperbaiki data lama -- dipicu lewat tombol "Sinkronkan
+ * Nama dengan Anggota" di halaman Kepengurusan, atau lewat script sekali
+ * jalan. Kalau 2 kata pertama cocok dengan LEBIH DARI SATU akun berbeda,
+ * jabatan itu dilewati (tidak ditebak sembarangan) -- Admin perlu
+ * menghubungkan manual lewat Edit.
  */
 export async function backfillAllPositionLinks(): Promise<BackfillResult> {
   const [unlinkedPositions, allUsers] = await Promise.all([
@@ -66,14 +74,29 @@ export async function backfillAllPositionLinks(): Promise<BackfillResult> {
     prisma.user.findMany({ select: { id: true, name: true } }),
   ]);
 
-  const userByNormalizedName = new Map(allUsers.map((u) => [normalizeName(u.name), u]));
+  const usersByKey = new Map<string, typeof allUsers>();
+  for (const u of allUsers) {
+    const key = matchKey(u.name);
+    const list = usersByKey.get(key) ?? [];
+    list.push(u);
+    usersByKey.set(key, list);
+  }
 
   const details: string[] = [];
   let linked = 0;
   for (const pos of unlinkedPositions) {
     if (!pos.memberName) continue;
-    const match = userByNormalizedName.get(normalizeName(pos.memberName));
-    if (!match) continue;
+    const candidates = usersByKey.get(matchKey(pos.memberName)) ?? [];
+    if (candidates.length === 0) continue;
+    if (candidates.length > 1) {
+      details.push(
+        `${pos.memberName} -> dilewati (cocok dengan ${candidates.length} akun berbeda: ${candidates
+          .map((c) => c.name)
+          .join(", ")})`
+      );
+      continue;
+    }
+    const match = candidates[0];
     await prisma.position.update({ where: { id: pos.id }, data: { userId: match.id } });
     linked += 1;
     details.push(`${pos.memberName} -> ${match.name}`);
