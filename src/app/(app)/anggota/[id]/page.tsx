@@ -77,6 +77,12 @@ export default async function AnggotaDetailPage({
               </dd>
             </div>
           )}
+          {member.motherClan && (
+            <div className="flex justify-between border-b border-slate-100 pb-2">
+              <dt className="text-slate-500">Tubu/Boru ni Mama</dt>
+              <dd className="font-medium text-slate-900">{member.motherClan}</dd>
+            </div>
+          )}
           {canSeeFull && member.address && (
             <div className="flex justify-between border-b border-slate-100 pb-2">
               <dt className="text-slate-500">Alamat</dt>

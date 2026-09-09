@@ -31,6 +31,7 @@ export default async function EditMemberPage({
             gender: member.gender ?? undefined,
             birthPlace: member.birthPlace ?? "",
             birthDate: member.birthDate ? member.birthDate.toISOString().slice(0, 10) : "",
+            motherClan: member.motherClan ?? "",
             address: member.address ?? "",
             memberNumber: member.memberNumber ?? "",
             membershipStatus: member.membershipStatus,

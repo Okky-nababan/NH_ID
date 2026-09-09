@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 const adminLinks = [
   { href: "/admin/users", label: "User & Izin" },
   { href: "/admin/password-reset", label: "Lupa Password" },
+  { href: "/admin/profile-edit-requests", label: "Edit Biodata" },
   { href: "/admin/pengumuman", label: "Pengumuman" },
   { href: "/admin/audit-log", label: "Audit Log" },
 ];

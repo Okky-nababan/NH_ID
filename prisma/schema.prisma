@@ -120,6 +120,9 @@ model User {
   gender            Gender?
   birthPlace        String?
   birthDate         DateTime?
+  /// Tubu/boru ni mama -- marga (klan) pihak ibu, sesuai adat Batak.
+  /// Diisi Admin/Pengurus, sama seperti data biodata lainnya.
+  motherClan        String?
   address           String?
   membershipStatus  MembershipStatus @default(AKTIF)
   notes             String?
@@ -143,6 +146,8 @@ model User {
   auditLogs         AuditLog[]
   choirSongs        ChoirSong[]
   resolvedPasswordResets PasswordResetRequest[]
+  profileEditRequests         ProfileEditRequest[] @relation("ProfileEditRequester")
+  resolvedProfileEditRequests ProfileEditRequest[] @relation("ProfileEditResolver")
 
   @@index([membershipStatus])
   @@index([role])
@@ -393,6 +398,27 @@ model PasswordResetRequest {
   createdAt    DateTime             @default(now())
 
   resolvedBy User? @relation(fields: [resolvedById], references: [id])
+
+  @@index([status])
+}
+
+/// Permintaan anggota untuk mengubah biodatanya sendiri. Anggota TIDAK bisa
+/// mengedit biodata langsung (nama, telepon, alamat, tempat/tanggal lahir,
+/// marga ibu, dll) -- hanya Admin/Pengurus yang bisa, lewat /anggota/[id]/edit.
+/// Anggota cuma bisa mengajukan permintaan (isi keterangan mau diubah apa)
+/// lewat halaman Profil Saya; Admin/Pengurus melihat & memprosesnya di
+/// /admin/profile-edit-requests.
+model ProfileEditRequest {
+  id           String              @id @default(cuid())
+  userId       String
+  message      String
+  status       PasswordResetStatus @default(PENDING)
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime            @default(now())
+
+  user       User  @relation("ProfileEditRequester", fields: [userId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("ProfileEditResolver", fields: [resolvedById], references: [id])
 
   @@index([status])
 }

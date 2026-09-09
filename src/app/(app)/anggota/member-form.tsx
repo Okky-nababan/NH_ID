@@ -194,6 +194,18 @@ export function MemberForm({ memberId, initial }: Props) {
       </div>
 
       <div>
+        <label className="block text-sm font-medium text-slate-700">
+          Tubu/Boru ni Mama (Marga Ibu)
+        </label>
+        <input
+          type="text"
+          placeholder="Mis. Boru Sihombing"
+          {...register("motherClan")}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
         <label className="block text-sm font-medium text-slate-700">Alamat</label>
         <input
           type="text"

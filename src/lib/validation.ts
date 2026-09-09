@@ -18,19 +18,32 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
-/** Self-service: field yang boleh diubah anggota untuk profilnya sendiri. */
-export const profileUpdateSchema = z.object({
-  name: z.string().trim().min(2, "Nama minimal 2 karakter"),
-  phone: z
+/**
+ * Self-service: anggota TIDAK berhak mengubah biodatanya sendiri (nama,
+ * telepon, alamat, tanggal lahir, dll) -- hanya Admin/Pengurus lewat
+ * memberSchema di bawah. Anggota hanya berhak: ganti password sendiri,
+ * atau ajukan permintaan edit biodata ke Admin/Pengurus.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Password saat ini wajib diisi"),
+    newPassword: z.string().min(8, "Password baru minimal 8 karakter"),
+    confirmNewPassword: z.string().min(1, "Konfirmasi password wajib diisi"),
+  })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: "Konfirmasi password baru tidak cocok",
+    path: ["confirmNewPassword"],
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const profileEditRequestSchema = z.object({
+  message: z
     .string()
     .trim()
-    .min(9, "Nomor HP minimal 9 digit")
-    .regex(/^[0-9+\-\s]+$/, "Nomor HP hanya boleh berisi angka"),
-  address: z.string().trim().max(255).optional().or(z.literal("")),
-  birthDate: z.string().optional().or(z.literal("")),
-  photoUrl: z.string().optional().or(z.literal("")),
+    .min(5, "Jelaskan data apa yang ingin diubah (minimal 5 karakter)")
+    .max(500),
 });
-export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+export type ProfileEditRequestInput = z.infer<typeof profileEditRequestSchema>;
 
 export const adminUserUpdateSchema = z.object({
   role: z.enum(["ADMIN", "PENGURUS", "ANGGOTA"]).optional(),
@@ -68,6 +81,7 @@ export const memberSchema = z.object({
   gender: z.enum(["LAKI_LAKI", "PEREMPUAN"]).optional(),
   birthPlace: z.string().trim().max(100).optional().or(z.literal("")),
   birthDate: z.string().optional().or(z.literal("")),
+  motherClan: z.string().trim().max(100).optional().or(z.literal("")),
   address: z.string().trim().max(255).optional().or(z.literal("")),
   memberNumber: z.string().trim().max(50).optional().or(z.literal("")),
   membershipStatus: z.enum(["AKTIF", "TIDAK_AKTIF", "PINDAH", "MENGUNDURKAN_DIRI"]),

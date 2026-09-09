@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { Tabs } from "@/components/tabs";
 import { MONTH_NAMES_ID } from "@/lib/constants";
 import { ATTENDANCE_STATUS_LABELS, CASH_STATUS_LABELS, CASH_STATUS_CLASS } from "@/lib/labels";
-import { ProfileForm } from "./profile-form";
+import { ProfileInfo } from "./profile-info";
+import { ChangePasswordForm } from "./change-password-form";
+import { EditRequestForm } from "./edit-request-form";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("id-ID", { dateStyle: "long" }).format(date);
@@ -14,7 +16,7 @@ export default async function ProfilPage() {
   const session = await auth();
   const userId = session!.user.id;
 
-  const [user, payments, attendances, positions] = await Promise.all([
+  const [user, payments, attendances, positions, editRequests] = await Promise.all([
     // findUnique (bukan findUniqueOrThrow): sesi JWT bisa saja masih hidup
     // untuk akun yang sudah dihapus/dinonaktifkan admin — redirect ke
     // login dengan mulus, bukan crash ke halaman error.
@@ -35,6 +37,11 @@ export default async function ProfilPage() {
       include: { period: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.profileEditRequest.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
   ]);
 
   if (!user) redirect("/login");
@@ -44,17 +51,39 @@ export default async function ProfilPage() {
       id: "informasi",
       label: "Informasi",
       content: (
-        <div className="rounded-lg border border-slate-200 bg-white p-6">
-          <ProfileForm
-            userId={user.id}
-            initial={{
-              name: user.name,
-              phone: user.phone,
-              address: user.address ?? "",
-              birthDate: user.birthDate ? user.birthDate.toISOString().slice(0, 10) : "",
-              photoUrl: user.photoUrl ?? "",
-            }}
-          />
+        <div className="space-y-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <ProfileInfo
+              name={user.name}
+              phone={user.phone}
+              address={user.address ?? ""}
+              birthPlace={user.birthPlace ?? ""}
+              birthDate={user.birthDate}
+              motherClan={user.motherClan ?? ""}
+              photoUrl={user.photoUrl ?? ""}
+            />
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-slate-900">Ganti Password</h2>
+            <div className="mt-4">
+              <ChangePasswordForm />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-slate-900">Ajukan Perubahan Biodata</h2>
+            <div className="mt-4">
+              <EditRequestForm
+                pastRequests={editRequests.map((r) => ({
+                  id: r.id,
+                  message: r.message,
+                  status: r.status,
+                  createdAt: r.createdAt.toISOString(),
+                }))}
+              />
+            </div>
+          </div>
         </div>
       ),
     },
