@@ -84,11 +84,15 @@ export function SongForm() {
 
       <div>
         <label className="block text-sm font-medium text-slate-700">
-          Halaman Partitur (foto/scan, urutan sesuai pilihan file)
+          Halaman Partitur (foto/scan gambar, atau PDF)
         </label>
+        <p className="mt-0.5 text-xs text-slate-400">
+          Bisa unggah PNG/JPG/WEBP per halaman, atau satu file PDF (bisa berisi banyak
+          halaman sekaligus) -- urutan sesuai pilihan file.
+        </p>
         <input
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,application/pdf"
           multiple
           onChange={handleFilesChange}
           disabled={uploading}
@@ -100,9 +104,16 @@ export function SongForm() {
       {pageUrls.length > 0 && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
           {pageUrls.map((url, i) => (
-            <div key={url} className="group relative aspect-[3/4] overflow-hidden rounded border border-slate-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={`Halaman ${i + 1}`} className="h-full w-full object-cover" />
+            <div key={url} className="group relative aspect-[3/4] overflow-hidden rounded border border-slate-200 bg-slate-50">
+              {url.toLowerCase().endsWith(".pdf") ? (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center">
+                  <span className="text-2xl">📄</span>
+                  <span className="text-[10px] font-medium text-slate-600">PDF</span>
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt={`Halaman ${i + 1}`} className="h-full w-full object-cover" />
+              )}
               <button
                 type="button"
                 onClick={() => removePage(i)}

@@ -5,8 +5,11 @@ import { randomUUID } from "node:crypto";
 import { put } from "@vercel/blob";
 import { requireUser } from "@/lib/api-auth";
 
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const MAX_SIZE = 3 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ALLOWED_PDF_TYPE = "application/pdf";
+const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
+// Scan partitur PDF biasanya lebih besar dari foto biasa -- batas lebih longgar.
+const MAX_PDF_SIZE = 15 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const { session, error } = await requireUser();
@@ -18,17 +21,24 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "File tidak ditemukan" }, { status: 400 });
   }
-  if (!ALLOWED_TYPES.includes(file.type)) {
+
+  const isPdf = file.type === ALLOWED_PDF_TYPE;
+  const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+  if (!isPdf && !isImage) {
     return NextResponse.json(
-      { error: "Format file harus PNG, JPG, atau WEBP" },
+      { error: "Format file harus PNG, JPG, WEBP, atau PDF" },
       { status: 400 }
     );
   }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "Ukuran file maksimal 3MB" }, { status: 400 });
+  const maxSize = isPdf ? MAX_PDF_SIZE : MAX_IMAGE_SIZE;
+  if (file.size > maxSize) {
+    return NextResponse.json(
+      { error: `Ukuran file maksimal ${isPdf ? "15MB" : "3MB"}` },
+      { status: 400 }
+    );
   }
 
-  const ext = file.type.split("/")[1];
+  const ext = isPdf ? "pdf" : file.type.split("/")[1];
   const filename = `${session!.user.id}-${randomUUID()}.${ext}`;
 
   // Di produksi (Vercel), filesystem bersifat read-only/sementara, jadi foto
