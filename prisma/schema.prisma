@@ -298,6 +298,22 @@ model TreasurySummary {
   syncedAt        DateTime @default(now())
 }
 
+/// Ringkasan iuran bulanan per tahun/bulan, disinkron dari tab "KAS <tahun>"
+/// spreadsheet (bukan dari CashPayment -- sheet KAS mencatat per anggota
+/// per bulan lewat nama, terpisah dari fitur "Catat Pembayaran Kas" di web).
+model DuesMonthlySummary {
+  id          String   @id @default(cuid())
+  year        Int
+  month       Int
+  totalAmount Int
+  paidCount   Int
+  memberCount Int
+  syncedAt    DateTime @default(now())
+
+  @@unique([year, month])
+  @@index([year])
+}
+
 // ============ Partitur Koor ============
 
 /// Satu judul lagu koor. Halaman-halaman partiturnya (hasil scan) disimpan

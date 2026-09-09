@@ -41,9 +41,7 @@ export default async function LaporanKasPage({
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [activeMembers, payments, yearTx, saldoAwalAgg, treasury] = await Promise.all([
-    prisma.user.count({ where: { isActive: true } }),
-    prisma.cashPayment.findMany({ where: { year } }),
+  const [yearTx, saldoAwalAgg, treasury, duesSummary] = await Promise.all([
     prisma.transaction.findMany({
       where: { date: { gte: yearStart, lt: yearEnd } },
       orderBy: { date: "asc" },
@@ -55,6 +53,9 @@ export default async function LaporanKasPage({
       _sum: { amount: true },
     }),
     prisma.treasurySummary.findUnique({ where: { id: "main" } }),
+    // Iuran bulanan per anggota — disinkron dari tab "KAS <tahun>" spreadsheet
+    // (lihat /api/kas/sync), BUKAN dari fitur "Catat Pembayaran Kas" di web.
+    prisma.duesMonthlySummary.findMany({ where: { year }, orderBy: { month: "asc" } }),
   ]);
 
   const saldoAwal =
@@ -80,33 +81,38 @@ export default async function LaporanKasPage({
     ];
   }, []);
 
-  // Rincian per kategori — supaya jelas uang paling banyak kepakai untuk apa.
-  const categoryTotals = new Map<string, { masuk: number; keluar: number; count: number }>();
+  // Rincian per kategori — hanya kebutuhan (pengeluaran) yang sudah
+  // digunakan per kategori kegiatan. Pemasukan sengaja tidak ditampilkan di
+  // sini (bukan "kebutuhan"), dan kategori tanpa pengeluaran tidak dilist.
+  const categoryTotals = new Map<string, { keluar: number; keluarCount: number }>();
   for (const t of yearTx) {
-    const entry = categoryTotals.get(t.category) ?? { masuk: 0, keluar: 0, count: 0 };
-    if (t.type === "MASUK") entry.masuk += t.amount;
-    else entry.keluar += t.amount;
-    entry.count += 1;
+    if (t.type !== "KELUAR") continue;
+    const entry = categoryTotals.get(t.category) ?? { keluar: 0, keluarCount: 0 };
+    entry.keluar += t.amount;
+    entry.keluarCount += 1;
     categoryTotals.set(t.category, entry);
   }
   const categoryRows = Array.from(categoryTotals.entries())
-    .map(([category, v]) => ({ category, ...v, net: v.masuk - v.keluar }))
-    .sort((a, b) => b.masuk + b.keluar - (a.masuk + a.keluar));
-  const maxCategoryFlow = Math.max(1, ...categoryRows.map((c) => c.masuk + c.keluar));
+    .map(([category, v]) => ({ category, ...v }))
+    .sort((a, b) => b.keluar - a.keluar);
+  const maxCategoryExpense = Math.max(1, ...categoryRows.map((c) => c.keluar));
 
+  // Iuran bulanan: total terkumpul & jumlah yang sudah bayar per bulan,
+  // dari hasil sinkron tab "KAS <tahun>" spreadsheet.
+  const memberCountInSheet = duesSummary[0]?.memberCount ?? 0;
   const duesRows = Array.from({ length: 12 }, (_, i) => {
     const month = i + 1;
-    const paid = payments.filter((p) => p.month === month && p.status === "LUNAS");
+    const row = duesSummary.find((d) => d.month === month);
     return {
       month,
       label: MONTH_NAMES_ID[i],
-      paidCount: paid.length,
-      unpaidCount: Math.max(activeMembers - paid.length, 0),
-      total: paid.reduce((sum, p) => sum + p.amount, 0),
+      paidCount: row?.paidCount ?? 0,
+      unpaidCount: Math.max(memberCountInSheet - (row?.paidCount ?? 0), 0),
+      total: row?.totalAmount ?? 0,
     };
   });
   const totalDuesYear = duesRows.reduce((sum, r) => sum + r.total, 0);
-  const anyDuesTracked = payments.length > 0;
+  const anyDuesTracked = duesSummary.length > 0;
 
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
@@ -174,32 +180,29 @@ export default async function LaporanKasPage({
         </div>
       </div>
 
-      {/* Rincian per kategori: ke mana saja uang kas mengalir tahun ini. */}
+      {/* Rincian per kategori: kebutuhan (pengeluaran) yang sudah digunakan
+          per kategori kegiatan tahun ini. */}
       <section>
         <h2 className="text-base font-semibold text-slate-900">Rincian per Kategori</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Total arus kas (masuk + keluar) per kategori kegiatan, diurutkan dari yang paling besar.
+          Kebutuhan yang sudah digunakan per kategori kegiatan, diurutkan dari yang paling besar.
         </p>
         {categoryRows.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">Belum ada transaksi tahun ini.</p>
+          <p className="mt-4 text-sm text-slate-500">Belum ada pengeluaran tahun ini.</p>
         ) : (
           <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-white p-5">
             {categoryRows.map((c) => (
               <div key={c.category}>
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-800">
-                    {c.category} <span className="text-xs text-slate-400">({c.count} transaksi)</span>
+                    {c.category} <span className="text-xs text-slate-400">({c.keluarCount} transaksi)</span>
                   </span>
-                  <span className="text-slate-600">
-                    <span className="text-green-600">+{formatRupiah(c.masuk)}</span>
-                    {" / "}
-                    <span className="text-red-600">-{formatRupiah(c.keluar)}</span>
-                  </span>
+                  <span className="font-medium text-slate-700">{formatRupiah(c.keluar)}</span>
                 </div>
                 <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     className={`h-full rounded-full ${CATEGORY_COLORS[c.category] ?? "bg-slate-400"}`}
-                    style={{ width: `${((c.masuk + c.keluar) / maxCategoryFlow) * 100}%` }}
+                    style={{ width: `${(c.keluar / maxCategoryExpense) * 100}%` }}
                   />
                 </div>
               </div>
@@ -257,8 +260,8 @@ export default async function LaporanKasPage({
         <h2 className="text-base font-semibold text-slate-900">Iuran Bulanan Anggota</h2>
         <p className="mt-1 text-sm text-slate-500">
           {anyDuesTracked
-            ? "Status pembayaran iuran bulanan yang dicatat Bendahara lewat halaman Uang Kas."
-            : "Belum ada pencatatan iuran bulanan per anggota untuk tahun ini — data di atas berasal dari ledger organisasi (pemasukan/pengeluaran umum), bukan dari fitur ini."}
+            ? `Total iuran dan jumlah yang sudah bayar per bulan, disinkron dari sheet "KAS ${year}" spreadsheet Bendahara.`
+            : `Belum ada data sinkron untuk tahun ${year} — klik "Sinkronkan dari Spreadsheet" untuk menariknya dari sheet "KAS ${year}".`}
         </p>
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -275,7 +278,7 @@ export default async function LaporanKasPage({
               {duesRows.map((r) => (
                 <tr key={r.month}>
                   <td className="px-4 py-2 text-slate-900">{r.label}</td>
-                  <td className="px-4 py-2 text-right text-slate-600">{activeMembers}</td>
+                  <td className="px-4 py-2 text-right text-slate-600">{memberCountInSheet}</td>
                   <td className="px-4 py-2 text-right text-green-600">{r.paidCount}</td>
                   <td className="px-4 py-2 text-right text-red-600">{r.unpaidCount}</td>
                   <td className="px-4 py-2 text-right font-medium text-slate-900">

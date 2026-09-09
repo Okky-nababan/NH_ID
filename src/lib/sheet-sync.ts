@@ -16,6 +16,15 @@ const REKAP_TABS: { gid: string; year: number }[] = [
 ];
 const TOTAL_KEUANGAN_GID = "1298894498";
 
+/** Tab iuran bulanan per anggota — diambil lewat nama sheet (bukan gid). */
+const DUES_SHEET_NAMES: { name: string; year: number }[] = [
+  { name: "KAS 2024", year: 2024 },
+  { name: "KAS 2025", year: 2025 },
+  { name: "KAS 2026", year: 2026 },
+];
+/** Kolom Januari dimulai di index 5 (0-based), 12 kolom berurutan s/d Desember. */
+const DUES_MONTH_START_COL = 5;
+
 const MONTHS: Record<string, number> = {
   januari: 1, februari: 2, maret: 3, april: 4, mei: 5, juni: 6,
   juli: 7, agustus: 8, agutstus: 8, austus: 8, september: 9,
@@ -152,6 +161,17 @@ async function fetchCsv(gid: string): Promise<string> {
   return res.text();
 }
 
+/** Tab "KAS <tahun>" tidak punya gid tetap yang diketahui, jadi diambil
+ * lewat nama sheet menggunakan endpoint gviz (mendukung query by nama). */
+async function fetchCsvBySheetName(sheetName: string): Promise<string> {
+  const res = await fetch(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) throw new Error(`Gagal mengambil sheet "${sheetName}": HTTP ${res.status}`);
+  return res.text();
+}
+
 export async function fetchAllTransactions(): Promise<ParsedTx[]> {
   let all: ParsedTx[] = [];
   for (const tab of REKAP_TABS) {
@@ -198,4 +218,55 @@ export async function fetchTreasurySummary(): Promise<TreasurySummaryData> {
   }
 
   return { saldoResmi, asOfLabel, cumAmount, bendaharaAmount };
+}
+
+export type DuesMonthSummary = { month: number; totalAmount: number; paidCount: number };
+export type DuesYearData = { year: number; memberCount: number; months: DuesMonthSummary[] };
+
+/**
+ * Ambil ringkasan iuran bulanan dari tab "KAS <tahun>". Bentuk sheet-nya:
+ * kolom B = Nama, kolom F..Q (index 5..16, 0-based) = 12 kolom Januari s/d
+ * Desember (nilai "Rp10.000" kalau sudah bayar bulan itu, kosong kalau
+ * belum). Baris anggota dikenali dari kolom Nama TIDAK kosong — ini juga
+ * otomatis melewati baris "1,2,...,12" (label nomor bulan, muncul di
+ * beberapa tahun) dan baris total di paling bawah, karena keduanya punya
+ * kolom Nama kosong.
+ */
+function extractDuesSummary(rows: string[][], year: number): DuesYearData {
+  const months: DuesMonthSummary[] = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    totalAmount: 0,
+    paidCount: 0,
+  }));
+  let memberCount = 0;
+  let headerSeen = false;
+
+  for (const cols of rows) {
+    const name = (cols[1] ?? "").trim();
+    if (!headerSeen) {
+      if (name.toLowerCase() === "nama") headerSeen = true;
+      continue;
+    }
+    if (!name) continue; // lewati baris label nomor bulan & baris total
+
+    memberCount += 1;
+    for (let m = 0; m < 12; m++) {
+      const amount = parseRupiah(cols[DUES_MONTH_START_COL + m] ?? "");
+      if (amount > 0) {
+        months[m].totalAmount += amount;
+        months[m].paidCount += 1;
+      }
+    }
+  }
+
+  return { year, memberCount, months };
+}
+
+export async function fetchAllDues(): Promise<DuesYearData[]> {
+  const results: DuesYearData[] = [];
+  for (const sheet of DUES_SHEET_NAMES) {
+    const csv = await fetchCsvBySheetName(sheet.name);
+    results.push(extractDuesSummary(parseCsv(csv), sheet.year));
+  }
+  return results;
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
 import { logAudit } from "@/lib/audit";
-import { fetchAllTransactions, fetchTreasurySummary } from "@/lib/sheet-sync";
+import { fetchAllTransactions, fetchTreasurySummary, fetchAllDues } from "@/lib/sheet-sync";
 
 /**
  * Tarik ulang data terbaru dari spreadsheet Bendahara (Google Sheets) dan
@@ -17,9 +17,10 @@ import { fetchAllTransactions, fetchTreasurySummary } from "@/lib/sheet-sync";
  */
 async function runSync(request: Request, actorUserId: string | null, isCron: boolean) {
   try {
-    const [transactions, summary] = await Promise.all([
+    const [transactions, summary, dues] = await Promise.all([
       fetchAllTransactions(),
       fetchTreasurySummary(),
+      fetchAllDues(),
     ]);
 
     await prisma.$transaction([
@@ -53,11 +54,36 @@ async function runSync(request: Request, actorUserId: string | null, isCron: boo
       }),
     ]);
 
+    // Upsert iuran satu per satu (bukan dalam satu $transaction besar) --
+    // 36 statement (3 tahun x 12 bulan) sering melebihi batas waktu
+    // transaksi interaktif Neon. Masing-masing upsert sudah atomik sendiri.
+    for (const yearData of dues) {
+      for (const m of yearData.months) {
+        await prisma.duesMonthlySummary.upsert({
+          where: { year_month: { year: yearData.year, month: m.month } },
+          update: {
+            totalAmount: m.totalAmount,
+            paidCount: m.paidCount,
+            memberCount: yearData.memberCount,
+            syncedAt: new Date(),
+          },
+          create: {
+            year: yearData.year,
+            month: m.month,
+            totalAmount: m.totalAmount,
+            paidCount: m.paidCount,
+            memberCount: yearData.memberCount,
+          },
+        });
+      }
+    }
+
+    const duesMemberTotal = dues.reduce((sum, y) => sum + y.memberCount, 0);
     await logAudit({
       userId: actorUserId,
       action: "SYNC_CASH_SHEET",
       module: "transaction",
-      description: `Sinkronisasi dari spreadsheet Bendahara: ${transactions.length} transaksi, saldo resmi Rp${summary.saldoResmi.toLocaleString("id-ID")} (per ${summary.asOfLabel})${isCron ? " [otomatis/cron]" : ""}`,
+      description: `Sinkronisasi dari spreadsheet Bendahara: ${transactions.length} transaksi, saldo resmi Rp${summary.saldoResmi.toLocaleString("id-ID")} (per ${summary.asOfLabel}), iuran ${duesMemberTotal} baris anggota di ${dues.length} tahun${isCron ? " [otomatis/cron]" : ""}`,
       request,
     });
 
