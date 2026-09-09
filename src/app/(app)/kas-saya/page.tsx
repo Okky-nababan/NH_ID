@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { MONTH_NAMES_ID, MONTHLY_DUES } from "@/lib/constants";
@@ -24,7 +25,11 @@ export default async function KasSayaPage() {
     prisma.cashPayment.findMany({ where: { userId: session!.user.id, year } }),
   ]);
 
-  const joinedAt = user!.joinedAt;
+  // Sesi bisa jadi basi (mis. akun dihapus lalu dibuat ulang oleh Admin) --
+  // lebih baik minta login ulang daripada crash dengan error generik.
+  if (!user) redirect("/login");
+
+  const joinedAt = user.joinedAt;
   const joinYear = joinedAt.getFullYear();
   const joinMonth = joinedAt.getMonth() + 1;
 
