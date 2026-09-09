@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validation";
 import { appendMemberToKasSheet } from "@/lib/sheet-sync";
+import { linkPositionsForNewUser } from "@/lib/position-sync";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -46,6 +47,10 @@ export async function POST(request: Request) {
   } catch (err) {
     console.warn(`Gagal sinkron anggota baru "${name}" ke spreadsheet:`, err);
   }
+
+  // Hubungkan otomatis ke jabatan kepengurusan yang namanya cocok tapi
+  // belum punya akun terhubung.
+  await linkPositionsForNewUser(user.id, name);
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

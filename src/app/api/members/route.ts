@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/permissions";
 import { memberSchema } from "@/lib/validation";
 import { logAudit } from "@/lib/audit";
 import { appendMemberToKasSheet } from "@/lib/sheet-sync";
+import { linkPositionsForNewUser } from "@/lib/position-sync";
 
 const BASE_SELECT = {
   id: true,
@@ -114,6 +115,10 @@ export async function POST(request: Request) {
   } catch (err) {
     console.warn(`Gagal sinkron anggota baru "${member.name}" ke spreadsheet:`, err);
   }
+
+  // Hubungkan otomatis ke jabatan kepengurusan yang namanya cocok tapi
+  // belum punya akun terhubung.
+  await linkPositionsForNewUser(member.id, member.name);
 
   return NextResponse.json({ member }, { status: 201 });
 }
