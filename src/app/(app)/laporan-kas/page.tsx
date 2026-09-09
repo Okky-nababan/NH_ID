@@ -41,7 +41,7 @@ export default async function LaporanKasPage({
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [activeMembers, payments, yearTx, saldoAwalAgg, allTimeAgg, treasury] = await Promise.all([
+  const [activeMembers, payments, yearTx, saldoAwalAgg, treasury] = await Promise.all([
     prisma.user.count({ where: { isActive: true } }),
     prisma.cashPayment.findMany({ where: { year } }),
     prisma.transaction.findMany({
@@ -54,15 +54,8 @@ export default async function LaporanKasPage({
       where: { date: { lt: yearStart } },
       _sum: { amount: true },
     }),
-    // Saldo dari SELURUH riwayat transaksi (semua tahun) — dibandingkan
-    // transparan dengan saldo resmi versi Bendahara di bawah.
-    prisma.transaction.groupBy({ by: ["type"], _sum: { amount: true } }),
     prisma.treasurySummary.findUnique({ where: { id: "main" } }),
   ]);
-
-  const saldoLedgerKeseluruhan =
-    (allTimeAgg.find((a) => a.type === "MASUK")?._sum.amount ?? 0) -
-    (allTimeAgg.find((a) => a.type === "KELUAR")?._sum.amount ?? 0);
 
   const saldoAwal =
     (saldoAwalAgg.find((a) => a.type === "MASUK")?._sum.amount ?? 0) -
@@ -154,48 +147,26 @@ export default async function LaporanKasPage({
           "Rekapitulasi <tahun>" (wajar untuk pembukuan yang masih berjalan). */}
       {treasury && (
         <div className="rounded-lg border-2 border-brand bg-blue-50 p-5 print:hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-brand-darker">
-                Saldo Kas Saat Ini <span className="font-normal">(versi Bendahara, per {treasury.asOfLabel})</span>
-              </p>
-              <p className="mt-1 text-2xl font-bold text-brand-darker">
-                {formatRupiah(treasury.saldoResmi)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Cum HKBP Immanuel: {formatRupiah(treasury.cumAmount)} &middot; Dipegang Bendahara:{" "}
-                {formatRupiah(treasury.bendaharaAmount)}
-              </p>
-            </div>
-            {saldoLedgerKeseluruhan !== treasury.saldoResmi && (
-              <div className="max-w-xs rounded-md bg-white/60 p-3 text-xs text-slate-600">
-                <p className="font-medium text-slate-700">
-                  Saldo dari rincian transaksi tercatat: {formatRupiah(saldoLedgerKeseluruhan)}
-                </p>
-                <p className="mt-1">
-                  Selisih {formatRupiah(Math.abs(treasury.saldoResmi - saldoLedgerKeseluruhan))} kemungkinan
-                  karena transaksi bulan terbaru belum ditulis rinci di sheet Rekapitulasi.
-                </p>
-              </div>
-            )}
-          </div>
+          <p className="text-sm font-medium text-brand-darker">
+            Saldo Kas Saat Ini <span className="font-normal">(versi Bendahara, per {treasury.asOfLabel})</span>
+          </p>
+          <p className="mt-1 text-2xl font-bold text-brand-darker">
+            {formatRupiah(treasury.saldoResmi)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Cum HKBP Immanuel: {formatRupiah(treasury.cumAmount)} &middot; Dipegang Bendahara:{" "}
+            {formatRupiah(treasury.bendaharaAmount)}
+          </p>
         </div>
       )}
 
-      {/* Ringkasan utama: saldo awal -> pemasukan/pengeluaran -> saldo akhir,
-          urutan yang sama dengan cara pembukuan manual biasa dibaca. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Saldo Awal & Saldo Akhir saja -- kartu Total Pemasukan/Pengeluaran
+          dihapus atas permintaan karena angkanya belum selaras dengan
+          laporan resmi di spreadsheet. */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-5">
           <p className="text-sm text-slate-500">Saldo Awal {year}</p>
           <p className="mt-2 text-xl font-bold text-slate-900">{formatRupiah(saldoAwal)}</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">Total Pemasukan</p>
-          <p className="mt-2 text-xl font-bold text-green-600">{formatRupiah(totalIncome)}</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">Total Pengeluaran</p>
-          <p className="mt-2 text-xl font-bold text-red-600">{formatRupiah(totalExpense)}</p>
         </div>
         <div className="rounded-lg border-2 border-slate-300 bg-slate-50 p-5">
           <p className="text-sm font-medium text-slate-600">Saldo Akhir {year} (rincian tercatat)</p>
