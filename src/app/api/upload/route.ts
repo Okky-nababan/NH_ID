@@ -44,18 +44,24 @@ export async function POST(request: Request) {
   // Di produksi (Vercel), filesystem bersifat read-only/sementara, jadi foto
   // disimpan ke Vercel Blob. Di lokal (tanpa BLOB_READ_WRITE_TOKEN), fallback
   // ke disk public/uploads seperti sebelumnya.
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(`uploads/${filename}`, file, {
-      access: "public",
-      contentType: file.type,
-    });
-    return NextResponse.json({ url: blob.url });
+  try {
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const blob = await put(`uploads/${filename}`, file, {
+        access: "public",
+        contentType: file.type,
+      });
+      return NextResponse.json({ url: blob.url });
+    }
+
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    const filePath = path.join(uploadDir, filename);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(filePath, buffer);
+
+    return NextResponse.json({ url: `/uploads/${filename}` });
+  } catch (err) {
+    console.error("Gagal menyimpan file upload:", err);
+    const message = err instanceof Error ? err.message : "Kesalahan tidak diketahui";
+    return NextResponse.json({ error: `Gagal menyimpan file: ${message}` }, { status: 500 });
   }
-
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  const filePath = path.join(uploadDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-
-  return NextResponse.json({ url: `/uploads/${filename}` });
 }
