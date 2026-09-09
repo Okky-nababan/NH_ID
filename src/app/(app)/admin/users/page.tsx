@@ -22,8 +22,10 @@ export default async function AdminUsersPage() {
       <h2 className="text-lg font-semibold text-slate-900">Manajemen User &amp; Izin</h2>
       <p className="mt-1 text-sm text-slate-500">
         Ubah role atau berikan izin granular ke pengurus tertentu (mis. akses
-        kelola pembayaran kas hanya untuk Bendahara). Akun sendiri tidak bisa
-        diubah dari sini.
+        kelola pembayaran kas hanya untuk Bendahara). Tidak ada admin/pengurus
+        yang permanen — role sendiri pun boleh diturunkan, asal masih ada
+        minimal 1 admin aktif lain (supaya jabatan bisa diserahterimakan
+        tanpa mengunci akses siapa pun).
       </p>
       <div className="mt-4">
         <UserTable

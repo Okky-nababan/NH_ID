@@ -82,7 +82,7 @@ export function UserTable({
                   <td className="px-4 py-2">
                     <select
                       value={u.role}
-                      disabled={busyId === u.id || u.id === currentUserId}
+                      disabled={busyId === u.id}
                       onChange={(e) => update(u.id, { role: e.target.value })}
                       className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:opacity-50"
                     >
@@ -90,6 +90,11 @@ export function UserTable({
                       <option value="PENGURUS">Pengurus</option>
                       <option value="ADMIN">Admin</option>
                     </select>
+                    {u.id === currentUserId && (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Akun Anda sendiri. Butuh minimal 1 admin aktif lain untuk turun role.
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <span

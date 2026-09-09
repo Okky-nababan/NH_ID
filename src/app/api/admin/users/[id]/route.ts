@@ -30,11 +30,24 @@ export async function PATCH(
       { status: 400 }
     );
   }
+  // Tidak ada admin/pengurus yang permanen -- siapa pun (termasuk diri
+  // sendiri) boleh turun dari role ADMIN, SELAMA masih ada minimal 1 admin
+  // aktif lain yang bisa melanjutkan tugas kelola user/izin. Ini mencegah
+  // organisasi terkunci tanpa admin sama sekali, tapi tidak lagi mengunci
+  // satu orang jadi admin selamanya.
   if (id === session!.user.id && parsed.data.role && parsed.data.role !== "ADMIN") {
-    return NextResponse.json(
-      { error: "Tidak bisa menurunkan role akun sendiri" },
-      { status: 400 }
-    );
+    const otherActiveAdmins = await prisma.user.count({
+      where: { role: "ADMIN", isActive: true, id: { not: id } },
+    });
+    if (otherActiveAdmins === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Tunjuk admin lain terlebih dahulu sebelum menurunkan role Anda sendiri -- organisasi harus selalu punya minimal 1 admin aktif.",
+        },
+        { status: 400 }
+      );
+    }
   }
 
   const { permissions, ...userFields } = parsed.data;
