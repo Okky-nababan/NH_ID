@@ -209,9 +209,19 @@ export default async function Home() {
           <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
             <h2 className="text-2xl font-bold text-slate-900">Kontak</h2>
             <p className="mt-4 text-slate-600">
-              HKBP Immanuel Dumai — Jl. [alamat gereja], Dumai, Riau
+              Gereja HKBP Immanuel Ressort Immanuel Dumai — Jl. Pulau Mampu, Kota Dumai, Riau
             </p>
-            <p className="mt-1 text-slate-500">Instagram &amp; Facebook: segera hadir</p>
+            <p className="mt-1 text-slate-500">
+              Instagram &amp; TikTok:{" "}
+              <a
+                href="https://instagram.com/nhkbp_immanuel_dumai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-brand hover:underline"
+              >
+                @nhkbp_immanuel_dumai
+              </a>
+            </p>
           </div>
         </section>
       </main>

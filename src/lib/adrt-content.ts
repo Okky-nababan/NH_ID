@@ -17,6 +17,7 @@ export const ADRT_BAB: Bab[] = [
         points: [
           "Nama perkumpulan ini adalah Naposobulung HKBP (Huria Kristen Batak Protestan) IMMANUEL Ressort IMMANUEL DUMAI atau disingkat dengan NHKBP Immanuel Dumai.",
           "Alamat perkumpulan ini berada di gereja HKBP IMMANUEL Ressort IMMANUEL DUMAI, Jl. Pulau Mampu Kota Dumai.",
+          "Media sosial resmi NHKBP Immanuel Dumai: Instagram @nhkbp_immanuel_dumai dan TikTok @nhkbp_immanuel_dumai.",
         ],
       },
       {
