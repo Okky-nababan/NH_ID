@@ -34,7 +34,9 @@ export default async function Home() {
     ? await prisma.position.findMany({
         where: { periodId: activePeriod.id, status: "AKTIF" },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-        take: 8,
+        // 9, bukan 8 -- supaya jajaran inti (s/d Bendahara) tampil lengkap
+        // sebelum daftar per-seksi (Koordinator/Anggota Seksi ...) dimulai.
+        take: 9,
         include: { user: { select: { name: true, photoUrl: true } } },
       })
     : [];
