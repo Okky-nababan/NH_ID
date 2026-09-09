@@ -3,6 +3,10 @@
     {
       "path": "/api/kas/sync",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/activities/routine",
+      "schedule": "0 21 * * *"
     }
   ]
 }

@@ -216,6 +216,12 @@ model Activity {
   status           ActivityStatus @default(DIRENCANAKAN)
   notes            String?
   photoUrl         String?
+  /// true untuk kegiatan rutin Selasa/Jumat yang dibuat otomatis oleh
+  /// generator jadwal rutin (lihat src/lib/recurring-activity.ts) --
+  /// supaya generator tahu tanggal mana yang sudah terisi dan tidak
+  /// membuat duplikat, dan supaya jadwal rutin tidak pernah "ketinggalan"
+  /// walau pengurus lupa membuatnya manual.
+  isRoutine        Boolean        @default(false)
   createdById      String
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -225,6 +231,7 @@ model Activity {
   attendances    Attendance[]
 
   @@index([date])
+  @@index([isRoutine, date])
 }
 
 model Attendance {

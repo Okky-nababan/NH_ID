@@ -118,7 +118,35 @@ export default async function ProfilPage() {
       id: "kehadiran",
       label: "Kehadiran",
       content: (
-        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+        <div className="space-y-3">
+          {attendances.length > 0 && (
+            <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+              <div>
+                <p className="text-slate-500">Persentase Hadir</p>
+                <p className="mt-1 text-lg font-bold text-green-600">
+                  {Math.round(
+                    (attendances.filter((a) => a.status === "HADIR").length / attendances.length) *
+                      100
+                  )}
+                  %
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Keaktifan (Hadir + Izin)</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">
+                  {Math.round(
+                    (attendances.filter((a) => a.status === "HADIR" || a.status === "IZIN")
+                      .length /
+                      attendances.length) *
+                      100
+                  )}
+                  %
+                </p>
+              </div>
+              <p className="text-xs text-slate-400">dari {attendances.length} kegiatan tercatat</p>
+            </div>
+          )}
+          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
           {attendances.length === 0 ? (
             <p className="p-4 text-sm text-slate-500">Belum ada riwayat kehadiran.</p>
           ) : (
@@ -134,6 +162,7 @@ export default async function ProfilPage() {
               </div>
             ))
           )}
+          </div>
         </div>
       ),
     },
