@@ -60,8 +60,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: `/uploads/${filename}` });
   } catch (err) {
+    // Detail error (mis. penyebab teknis) dicatat ke log server saja --
+    // pesan ke klien sengaja generik supaya tidak membocorkan detail
+    // internal server (path filesystem, dll).
     console.error("Gagal menyimpan file upload:", err);
-    const message = err instanceof Error ? err.message : "Kesalahan tidak diketahui";
-    return NextResponse.json({ error: `Gagal menyimpan file: ${message}` }, { status: 500 });
+    return NextResponse.json(
+      { error: "Gagal menyimpan file di server. Coba lagi, atau hubungi admin bila terus gagal." },
+      { status: 500 }
+    );
   }
 }
