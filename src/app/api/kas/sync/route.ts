@@ -89,7 +89,7 @@ async function runSync(request: Request, actorUserId: string | null, isCron: boo
       userId: actorUserId,
       action: "SYNC_CASH_SHEET",
       module: "transaction",
-      description: `Sinkronisasi dari spreadsheet Bendahara: ${transactions.length} transaksi, saldo resmi Rp${summary.saldoResmi.toLocaleString("id-ID")} (per ${summary.asOfLabel}), iuran ${duesMemberTotal} baris anggota di ${dues.length} tahun, ${cashPaymentResult.created} pembayaran per-anggota tersinkron (${cashPaymentResult.skippedNoAccount} belum ada akun, ${cashPaymentResult.skippedAmbiguous} nama ambigu)${isCron ? " [otomatis/cron]" : ""}`,
+      description: `Sinkronisasi dari spreadsheet Bendahara: ${transactions.length} transaksi, saldo resmi Rp${summary.saldoResmi.toLocaleString("id-ID")} (per ${summary.asOfLabel}), iuran ${duesMemberTotal} baris anggota di ${dues.length} tahun, ${cashPaymentResult.created} pembayaran per-anggota tersinkron (${cashPaymentResult.skippedNoAccount} belum ada akun, ${cashPaymentResult.skippedAmbiguous} nama ambigu), ${cashPaymentResult.joinDatesUpdated} tanggal bergabung diperbarui${isCron ? " [otomatis/cron]" : ""}`,
       request,
     });
 

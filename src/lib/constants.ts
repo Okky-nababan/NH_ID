@@ -1,4 +1,4 @@
-export const MONTHLY_DUES = 20000;
+export const MONTHLY_DUES = 10000;
 
 export const MONTH_NAMES_ID = [
   "Januari",

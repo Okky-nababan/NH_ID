@@ -297,9 +297,63 @@ export type DuesMonthSummary = { month: number; totalAmount: number; paidCount: 
 export type DuesYearData = { year: number; memberCount: number; months: DuesMonthSummary[] };
 
 /** Satu baris anggota dari tab "KAS <tahun>" -- nama apa adanya (belum
- * dicocokkan ke akun) + daftar bulan yang sudah dibayar (amount > 0 saja). */
-export type MemberDuesRow = { name: string; months: { month: number; amount: number }[] };
+ * dicocokkan ke akun), tanggal bergabung (kalau ada & bisa diparsing), +
+ * daftar bulan yang sudah dibayar (amount > 0 saja). */
+export type MemberDuesRow = {
+  name: string;
+  joinedAt: Date | null;
+  months: { month: number; amount: number }[];
+};
 export type DuesYearDetail = { year: number; rows: MemberDuesRow[] };
+
+const JOIN_MONTH_ALIASES: Record<string, number> = {
+  jan: 1, januari: 1,
+  feb: 2, februari: 2,
+  mar: 3, maret: 3,
+  apr: 4, april: 4,
+  mei: 5,
+  jun: 6, juni: 6,
+  jul: 7, juli: 7,
+  agu: 8, agust: 8, agustus: 8, agst: 8,
+  sep: 9, sept: 9, september: 9,
+  okt: 10, oktober: 10,
+  nov: 11, november: 11,
+  des: 12, desember: 12,
+};
+
+/**
+ * Parsing kolom "Bergabung" di tab "KAS <tahun>". Dua format ditemukan di
+ * data asli: teks "Mon 'YY" (mis. "April '25", "Feb'26", "Juli ' 24") dan
+ * tanggal numerik "DD.MM.YY" (mis. "28.05.24"). Kosong/tidak dikenali ->
+ * null (berarti "sudah anggota sejak sebelum sheet ini mulai dicatat",
+ * BUKAN berarti belum bergabung).
+ */
+function parseJoinLabel(raw: string): Date | null {
+  const text = raw.trim();
+  if (!text) return null;
+
+  const numeric = text.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
+  if (numeric) {
+    const day = parseInt(numeric[1], 10);
+    const month = parseInt(numeric[2], 10);
+    let year = parseInt(numeric[3], 10);
+    if (year < 100) year += 2000;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return new Date(year, month - 1, day);
+    }
+    return null;
+  }
+
+  const textMatch = text.match(/^([A-Za-z]+)\s*'?\s*(\d{2,4})$/);
+  if (textMatch) {
+    const month = JOIN_MONTH_ALIASES[textMatch[1].toLowerCase()];
+    let year = parseInt(textMatch[2], 10);
+    if (year < 100) year += 2000;
+    if (month) return new Date(year, month - 1, 1);
+  }
+
+  return null;
+}
 
 /**
  * Ambil rincian iuran PER ANGGOTA dari tab "KAS <tahun>". Bentuk sheet-nya:
@@ -327,7 +381,8 @@ function extractDuesDetail(rows: string[][], year: number): DuesYearDetail {
       const amount = parseRupiah(cols[DUES_MONTH_START_COL + m] ?? "");
       if (amount > 0) months.push({ month: m + 1, amount });
     }
-    result.push({ name, months });
+    const joinedAt = parseJoinLabel((cols[3] ?? "").trim());
+    result.push({ name, joinedAt, months });
   }
 
   return { year, rows: result };
