@@ -12,8 +12,12 @@ function formatRupiah(amount: number) {
   }).format(amount);
 }
 
+// timeZone eksplisit "UTC" -- tanggal bergabung disimpan sebagai
+// Date.UTC(...) (lihat sheet-sync.ts/cash-payment-sync.ts), jadi harus
+// dibaca kembali dengan UTC juga supaya tidak mundur/maju sehari
+// tergantung zona waktu server yang menjalankan (lokal WIB vs produksi).
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "long" }).format(date);
+  return new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeZone: "UTC" }).format(date);
 }
 
 export default async function KasSayaPage() {
@@ -30,8 +34,10 @@ export default async function KasSayaPage() {
   if (!user) redirect("/login");
 
   const joinedAt = user.joinedAt;
-  const joinYear = joinedAt.getFullYear();
-  const joinMonth = joinedAt.getMonth() + 1;
+  // getUTCFullYear/getUTCMonth (bukan versi lokal) -- konsisten dengan
+  // Date.UTC(...) yang dipakai saat menyimpan tanggal ini.
+  const joinYear = joinedAt.getUTCFullYear();
+  const joinMonth = joinedAt.getUTCMonth() + 1;
 
   const paidByMonth = new Map(payments.map((p) => [p.month, p]));
 

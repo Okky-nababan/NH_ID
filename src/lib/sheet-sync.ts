@@ -332,6 +332,10 @@ function parseJoinLabel(raw: string): Date | null {
   const text = raw.trim();
   if (!text) return null;
 
+  // Selalu pakai Date.UTC (bukan new Date(y,m,d) yang mengikuti zona
+  // waktu lokal proses yang menjalankannya) -- supaya tanggal yang
+  // tersimpan konsisten mewakili hari kalender yang sama persis baik
+  // dijalankan dari mesin lokal (WIB) maupun server produksi (UTC).
   const numeric = text.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
   if (numeric) {
     const day = parseInt(numeric[1], 10);
@@ -339,7 +343,7 @@ function parseJoinLabel(raw: string): Date | null {
     let year = parseInt(numeric[3], 10);
     if (year < 100) year += 2000;
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return new Date(year, month - 1, day);
+      return new Date(Date.UTC(year, month - 1, day));
     }
     return null;
   }
@@ -349,7 +353,7 @@ function parseJoinLabel(raw: string): Date | null {
     const month = JOIN_MONTH_ALIASES[textMatch[1].toLowerCase()];
     let year = parseInt(textMatch[2], 10);
     if (year < 100) year += 2000;
-    if (month) return new Date(year, month - 1, 1);
+    if (month) return new Date(Date.UTC(year, month - 1, 1));
   }
 
   return null;

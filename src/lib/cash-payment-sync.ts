@@ -21,6 +21,16 @@ function collectEarliestJoinDates(duesDetail: DuesYearDetail[]): Map<string, Dat
   return byNameKey;
 }
 
+/** Semua nama yang muncul di sheet tahun manapun (dengan/tanpa label
+ * "Bergabung" terparsing) -- dipakai untuk kasus kolom kosong. */
+function collectAllSheetNameKeys(duesDetail: DuesYearDetail[]): Set<string> {
+  const keys = new Set<string>();
+  for (const yearData of duesDetail) {
+    for (const row of yearData.rows) keys.add(firstTwoWordsKey(row.name));
+  }
+  return keys;
+}
+
 /**
  * Sinkronisasi iuran bulanan PER ANGGOTA dari tab "KAS <tahun>" spreadsheet
  * ke tabel CashPayment (dipakai halaman "Kas Saya" dan "Uang Kas"). Setiap
@@ -129,16 +139,41 @@ export async function syncCashPaymentsFromSheet(
   // -- dipakai untuk membedakan "belum bergabung" vs "belum bayar" di
   // halaman Kas Saya, dan supaya Profil Saya menampilkan tanggal yang
   // sesuai dengan catatan resmi Bendahara.
+  //
+  // PENTING: kolom "Bergabung" KOSONG di sheet berarti "sudah anggota
+  // sejak SEBELUM sheet ini mulai dicatat" (anggota lama) -- BUKAN
+  // "belum bergabung". Kalau dibiarkan, User.joinedAt tetap di tanggal
+  // default akun web didaftarkan (mis. hari ini), yang salah membuat
+  // anggota lama terlihat baru gabung bulan ini. Untuk kasus ini,
+  // tanggal bergabung diset ke 1 Januari tahun paling awal yang ada di
+  // sheet -- HANYA kalau itu memundurkan tanggal (tidak pernah memajukan
+  // tanggal yang sudah benar/lebih awal).
   const earliestJoinDates = collectEarliestJoinDates(duesDetail);
+  const allSheetNameKeys = collectAllSheetNameKeys(duesDetail);
+  const earliestSheetYear = Math.min(...years);
+  const longtimeMemberSentinel = new Date(Date.UTC(earliestSheetYear, 0, 1));
+
   let joinDatesUpdated = 0;
   for (const [key, candidates] of usersByKey) {
     if (candidates.length !== 1) continue; // ambigu -- jangan tebak
-    const joinedAt = earliestJoinDates.get(key);
-    if (!joinedAt) continue;
     const user = candidates[0];
-    if (user.joinedAt.getTime() === joinedAt.getTime()) continue;
-    await prisma.user.update({ where: { id: user.id }, data: { joinedAt } });
-    joinDatesUpdated += 1;
+
+    const parsedJoinedAt = earliestJoinDates.get(key);
+    if (parsedJoinedAt) {
+      if (user.joinedAt.getTime() !== parsedJoinedAt.getTime()) {
+        await prisma.user.update({ where: { id: user.id }, data: { joinedAt: parsedJoinedAt } });
+        joinDatesUpdated += 1;
+      }
+      continue;
+    }
+
+    if (allSheetNameKeys.has(key) && user.joinedAt > longtimeMemberSentinel) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { joinedAt: longtimeMemberSentinel },
+      });
+      joinDatesUpdated += 1;
+    }
   }
 
   return {
