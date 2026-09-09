@@ -253,6 +253,11 @@ model CashPayment {
   method        PaymentMethod?
   notes         String?
   recordedById  String?
+  /// true = dibuat otomatis oleh sinkronisasi tab "KAS <tahun>" spreadsheet
+  /// (akan ditimpa ulang tiap sinkron). false = dicatat manual oleh
+  /// Bendahara lewat form "Catat Pembayaran Kas" -- TIDAK PERNAH dihapus
+  /// atau ditimpa oleh proses sinkronisasi.
+  syncedFromSheet Boolean         @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
@@ -261,6 +266,7 @@ model CashPayment {
 
   @@unique([userId, month, year])
   @@index([year, month])
+  @@index([syncedFromSheet])
 }
 
 /// Ledger umum organisasi (donasi, pengeluaran non-iuran) — terpisah dari

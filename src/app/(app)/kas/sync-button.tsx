@@ -28,8 +28,14 @@ export function SyncButton() {
       setMessage(body.error || "Gagal menyinkronkan data");
       return;
     }
+    const cp = body.cashPaymentSync;
+    const cpText = cp
+      ? ` Iuran per-anggota: ${cp.created} pembayaran tersinkron${
+          cp.skippedNoAccount > 0 ? `, ${cp.skippedNoAccount} nama belum ada akun` : ""
+        }${cp.skippedAmbiguous > 0 ? `, ${cp.skippedAmbiguous} nama ambigu dilewati` : ""}.`
+      : "";
     setMessage(
-      `Berhasil: ${body.count} transaksi tersinkron, saldo resmi Rp${body.summary.saldoResmi.toLocaleString("id-ID")} (per ${body.summary.asOfLabel}).`
+      `Berhasil: ${body.count} transaksi tersinkron, saldo resmi Rp${body.summary.saldoResmi.toLocaleString("id-ID")} (per ${body.summary.asOfLabel}).${cpText}`
     );
     router.refresh();
   };

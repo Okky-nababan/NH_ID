@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
 import { logAudit } from "@/lib/audit";
-import { fetchAllTransactions, fetchTreasurySummary, fetchAllDues } from "@/lib/sheet-sync";
+import { fetchAllTransactions, fetchTreasurySummary, fetchAllDuesDetail, aggregateDuesYear } from "@/lib/sheet-sync";
+import { syncCashPaymentsFromSheet } from "@/lib/cash-payment-sync";
 
 /**
  * Tarik ulang data terbaru dari spreadsheet Bendahara (Google Sheets) dan
@@ -17,11 +18,12 @@ import { fetchAllTransactions, fetchTreasurySummary, fetchAllDues } from "@/lib/
  */
 async function runSync(request: Request, actorUserId: string | null, isCron: boolean) {
   try {
-    const [transactions, summary, dues] = await Promise.all([
+    const [transactions, summary, duesDetail] = await Promise.all([
       fetchAllTransactions(),
       fetchTreasurySummary(),
-      fetchAllDues(),
+      fetchAllDuesDetail(),
     ]);
+    const dues = duesDetail.map(aggregateDuesYear);
 
     await prisma.$transaction([
       prisma.transaction.deleteMany({ where: { syncedFromSheet: true } }),
@@ -78,16 +80,25 @@ async function runSync(request: Request, actorUserId: string | null, isCron: boo
       }
     }
 
+    // Sinkron iuran PER ANGGOTA ke CashPayment (Kas Saya / Uang Kas) --
+    // dicocokkan ke akun via 2 kata pertama nama (lihat name-match.ts).
+    const cashPaymentResult = await syncCashPaymentsFromSheet(duesDetail);
+
     const duesMemberTotal = dues.reduce((sum, y) => sum + y.memberCount, 0);
     await logAudit({
       userId: actorUserId,
       action: "SYNC_CASH_SHEET",
       module: "transaction",
-      description: `Sinkronisasi dari spreadsheet Bendahara: ${transactions.length} transaksi, saldo resmi Rp${summary.saldoResmi.toLocaleString("id-ID")} (per ${summary.asOfLabel}), iuran ${duesMemberTotal} baris anggota di ${dues.length} tahun${isCron ? " [otomatis/cron]" : ""}`,
+      description: `Sinkronisasi dari spreadsheet Bendahara: ${transactions.length} transaksi, saldo resmi Rp${summary.saldoResmi.toLocaleString("id-ID")} (per ${summary.asOfLabel}), iuran ${duesMemberTotal} baris anggota di ${dues.length} tahun, ${cashPaymentResult.created} pembayaran per-anggota tersinkron (${cashPaymentResult.skippedNoAccount} belum ada akun, ${cashPaymentResult.skippedAmbiguous} nama ambigu)${isCron ? " [otomatis/cron]" : ""}`,
       request,
     });
 
-    return NextResponse.json({ success: true, count: transactions.length, summary });
+    return NextResponse.json({
+      success: true,
+      count: transactions.length,
+      summary,
+      cashPaymentSync: cashPaymentResult,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Gagal menyinkronkan data";
     return NextResponse.json({ error: message }, { status: 502 });

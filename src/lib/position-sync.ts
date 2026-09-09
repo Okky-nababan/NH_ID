@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { firstTwoWordsKey as matchKey } from "@/lib/name-match";
 
 /**
  * Sinkronisasi otomatis antara jabatan kepengurusan (`Position.memberName`,
@@ -9,20 +10,6 @@ import { prisma } from "@/lib/prisma";
  * halaman anggota langsung muncul di halaman Kepengurusan tanpa perlu
  * Admin mengedit manual satu-satu.
  */
-
-/**
- * Kunci pencocokan nama: SENGAJA cuma 2 kata pertama (nama depan), bukan
- * nama lengkap -- di lapangan, nama di daftar Kepengurusan sering beda
- * marga/nama belakang dengan nama di akun anggota (mis. "Marlina Olivia
- * Sihombing" di Kepengurusan vs "Marlina Olivia Lumban Toruan" di akun),
- * jadi 2 kata pertama sudah cukup untuk mencocokkan orangnya. Huruf kecil
- * semua + spasi ganda dirapikan supaya beda kapitalisasi/spasi tidak
- * menggagalkan pencocokan.
- */
-function matchKey(name: string): string {
-  const words = name.trim().toLowerCase().replace(/\s+/g, " ").split(" ").filter(Boolean);
-  return words.slice(0, 2).join(" ");
-}
 
 /**
  * Dipanggil setiap ada anggota baru terdaftar (lewat /api/register atau

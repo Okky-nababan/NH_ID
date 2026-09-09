@@ -296,8 +296,13 @@ export async function fetchTreasurySummary(): Promise<TreasurySummaryData> {
 export type DuesMonthSummary = { month: number; totalAmount: number; paidCount: number };
 export type DuesYearData = { year: number; memberCount: number; months: DuesMonthSummary[] };
 
+/** Satu baris anggota dari tab "KAS <tahun>" -- nama apa adanya (belum
+ * dicocokkan ke akun) + daftar bulan yang sudah dibayar (amount > 0 saja). */
+export type MemberDuesRow = { name: string; months: { month: number; amount: number }[] };
+export type DuesYearDetail = { year: number; rows: MemberDuesRow[] };
+
 /**
- * Ambil ringkasan iuran bulanan dari tab "KAS <tahun>". Bentuk sheet-nya:
+ * Ambil rincian iuran PER ANGGOTA dari tab "KAS <tahun>". Bentuk sheet-nya:
  * kolom B = Nama, kolom F..Q (index 5..16, 0-based) = 12 kolom Januari s/d
  * Desember (nilai "Rp10.000" kalau sudah bayar bulan itu, kosong kalau
  * belum). Baris anggota dikenali dari kolom Nama TIDAK kosong — ini juga
@@ -305,13 +310,8 @@ export type DuesYearData = { year: number; memberCount: number; months: DuesMont
  * beberapa tahun) dan baris total di paling bawah, karena keduanya punya
  * kolom Nama kosong.
  */
-function extractDuesSummary(rows: string[][], year: number): DuesYearData {
-  const months: DuesMonthSummary[] = Array.from({ length: 12 }, (_, i) => ({
-    month: i + 1,
-    totalAmount: 0,
-    paidCount: 0,
-  }));
-  let memberCount = 0;
+function extractDuesDetail(rows: string[][], year: number): DuesYearDetail {
+  const result: MemberDuesRow[] = [];
   let headerSeen = false;
 
   for (const cols of rows) {
@@ -322,27 +322,42 @@ function extractDuesSummary(rows: string[][], year: number): DuesYearData {
     }
     if (!name) continue; // lewati baris label nomor bulan & baris total
 
-    memberCount += 1;
+    const months: { month: number; amount: number }[] = [];
     for (let m = 0; m < 12; m++) {
       const amount = parseRupiah(cols[DUES_MONTH_START_COL + m] ?? "");
-      if (amount > 0) {
-        months[m].totalAmount += amount;
-        months[m].paidCount += 1;
-      }
+      if (amount > 0) months.push({ month: m + 1, amount });
     }
+    result.push({ name, months });
   }
 
-  return { year, memberCount, months };
+  return { year, rows: result };
 }
 
-export async function fetchAllDues(): Promise<DuesYearData[]> {
+/** Ringkasan seluruh organisasi per bulan, diturunkan dari rincian per
+ * anggota (satu sumber data, dua bentuk tampilan). */
+export function aggregateDuesYear(detail: DuesYearDetail): DuesYearData {
+  const months: DuesMonthSummary[] = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    totalAmount: 0,
+    paidCount: 0,
+  }));
+  for (const row of detail.rows) {
+    for (const m of row.months) {
+      months[m.month - 1].totalAmount += m.amount;
+      months[m.month - 1].paidCount += 1;
+    }
+  }
+  return { year: detail.year, memberCount: detail.rows.length, months };
+}
+
+export async function fetchAllDuesDetail(): Promise<DuesYearDetail[]> {
   const tabs = await resolveTabsByPattern(/^KAS\s+(\d{4})$/i, []);
-  const results: DuesYearData[] = [];
+  const results: DuesYearDetail[] = [];
 
   if (tabs.length > 0) {
     for (const tab of tabs) {
       const csv = await fetchCsv(tab.gid);
-      results.push(extractDuesSummary(parseCsv(csv), tab.year));
+      results.push(extractDuesDetail(parseCsv(csv), tab.year));
     }
     return results;
   }
@@ -350,9 +365,14 @@ export async function fetchAllDues(): Promise<DuesYearData[]> {
   // Belum ada Google Sheets API -- pakai daftar nama statis sebagai fallback.
   for (const sheet of FALLBACK_DUES_NAMES) {
     const csv = await fetchCsvBySheetName(sheet.name);
-    results.push(extractDuesSummary(parseCsv(csv), sheet.year));
+    results.push(extractDuesDetail(parseCsv(csv), sheet.year));
   }
   return results;
+}
+
+export async function fetchAllDues(): Promise<DuesYearData[]> {
+  const detail = await fetchAllDuesDetail();
+  return detail.map(aggregateDuesYear);
 }
 
 // ============ Tambah anggota baru ke tab "KAS <tahun berjalan>" ============
