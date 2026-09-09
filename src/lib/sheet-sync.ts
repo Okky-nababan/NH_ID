@@ -1,27 +1,36 @@
 /**
  * Sinkronisasi data keuangan dari spreadsheet Bendahara (Google Sheets) ke
- * ledger organisasi. Sumber: 3 tab "Rekapitulasi <tahun>" (transaksi rinci)
- * + tab "Total Keuangan" (ringkasan saldo resmi versi Bendahara).
+ * ledger organisasi. Sumber: tab "Rekapitulasi <tahun>" (transaksi rinci),
+ * tab "KAS <tahun>" (iuran bulanan per anggota), dan tab "Total Keuangan"
+ * (ringkasan saldo resmi versi Bendahara).
+ *
+ * Daftar tab per tahun DIAMBIL OTOMATIS dari spreadsheet (lewat Google
+ * Sheets API, kalau sudah dikonfigurasi -- lihat google-sheets-client.ts)
+ * supaya tab tahun baru (mis. "KAS 2027") langsung terdeteksi tanpa perlu
+ * ubah kode. Kalau API belum dikonfigurasi, jatuh ke daftar statis di bawah
+ * (fallback) supaya sinkron tetap jalan.
  *
  * Dipakai oleh /api/kas/sync (dipicu manual dari web) dan oleh cron harian
  * (lihat vercel.json) untuk sinkronisasi otomatis berkala.
  */
 
+import { getSheetsClient, isGoogleSheetsConfigured } from "@/lib/google-sheets-client";
+
 const SHEET_ID = "1bGmAIjJuVn3ZLqk36cyaJ53mfK-wID8UbbCOLEClmXE";
 
-const REKAP_TABS: { gid: string; year: number }[] = [
+/** Dipakai HANYA jika GOOGLE_SERVICE_ACCOUNT_* belum diset. */
+const FALLBACK_REKAP_TABS: { gid: string; year: number }[] = [
   { gid: "238299411", year: 2024 },
   { gid: "1261206819", year: 2025 },
   { gid: "1642026533", year: 2026 },
 ];
-const TOTAL_KEUANGAN_GID = "1298894498";
-
-/** Tab iuran bulanan per anggota — diambil lewat nama sheet (bukan gid). */
-const DUES_SHEET_NAMES: { name: string; year: number }[] = [
+const FALLBACK_TOTAL_KEUANGAN_GID = "1298894498";
+const FALLBACK_DUES_NAMES: { name: string; year: number }[] = [
   { name: "KAS 2024", year: 2024 },
   { name: "KAS 2025", year: 2025 },
   { name: "KAS 2026", year: 2026 },
 ];
+
 /** Kolom Januari dimulai di index 5 (0-based), 12 kolom berurutan s/d Desember. */
 const DUES_MONTH_START_COL = 5;
 
@@ -30,6 +39,10 @@ const MONTHS: Record<string, number> = {
   juli: 7, agustus: 8, agutstus: 8, austus: 8, september: 9,
   oktober: 10, november: 11, desember: 12,
 };
+const MONTH_SHORT_ID = [
+  "Jan", "Feb", "Mar", "April", "Mei", "Juni",
+  "Juli", "Agust", "Sept", "Okt", "Nov", "Des",
+];
 
 /** Daftar kategori resmi — selaras dengan nama seksi di ADRT/Kepengurusan. */
 export const CATEGORIES = [
@@ -104,6 +117,60 @@ function parseRupiah(raw: string): number {
   return digits ? parseInt(digits, 10) : 0;
 }
 
+// ============ Daftar tab spreadsheet (dinamis via API, fallback statis) ============
+
+type SheetTab = { title: string; sheetId: number };
+type ResolvedTab = { gid: string; year: number };
+
+/** Cache per proses -- daftar tab jarang berubah (paling banter setahun
+ * sekali), jadi aman di-cache selama instance server hidup. */
+let tabListCache: SheetTab[] | null = null;
+
+async function listSheetTabs(): Promise<SheetTab[]> {
+  if (tabListCache) return tabListCache;
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: SHEET_ID,
+    fields: "sheets.properties",
+  });
+  tabListCache = (res.data.sheets ?? [])
+    .map((s) => ({ title: s.properties?.title ?? "", sheetId: s.properties?.sheetId ?? 0 }))
+    .filter((s) => s.title);
+  return tabListCache;
+}
+
+async function resolveTabsByPattern(pattern: RegExp, fallback: ResolvedTab[]): Promise<ResolvedTab[]> {
+  if (!isGoogleSheetsConfigured()) return fallback;
+  try {
+    const tabs = await listSheetTabs();
+    const matched = tabs
+      .map((t) => {
+        const m = t.title.match(pattern);
+        return m ? { gid: String(t.sheetId), year: parseInt(m[1], 10) } : null;
+      })
+      .filter((t): t is ResolvedTab => t !== null)
+      .sort((a, b) => a.year - b.year);
+    return matched.length > 0 ? matched : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function resolveTotalKeuanganGid(): Promise<string> {
+  if (isGoogleSheetsConfigured()) {
+    try {
+      const tabs = await listSheetTabs();
+      const match = tabs.find((t) => t.title.trim().toLowerCase() === "total keuangan");
+      if (match) return String(match.sheetId);
+    } catch {
+      // jatuh ke fallback di bawah
+    }
+  }
+  return FALLBACK_TOTAL_KEUANGAN_GID;
+}
+
+// ============ Rekapitulasi transaksi (ledger) ============
+
 export type ParsedTx = {
   date: Date;
   type: "MASUK" | "KELUAR";
@@ -161,8 +228,8 @@ async function fetchCsv(gid: string): Promise<string> {
   return res.text();
 }
 
-/** Tab "KAS <tahun>" tidak punya gid tetap yang diketahui, jadi diambil
- * lewat nama sheet menggunakan endpoint gviz (mendukung query by nama). */
+/** Fallback untuk tab "KAS <tahun>" yang belum diketahui gid-nya (dipakai
+ * hanya sebelum Google Sheets API dikonfigurasi). */
 async function fetchCsvBySheetName(sheetName: string): Promise<string> {
   const res = await fetch(
     `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
@@ -173,13 +240,16 @@ async function fetchCsvBySheetName(sheetName: string): Promise<string> {
 }
 
 export async function fetchAllTransactions(): Promise<ParsedTx[]> {
+  const tabs = await resolveTabsByPattern(/^Rekapitulasi\s+(\d{4})$/i, FALLBACK_REKAP_TABS);
   let all: ParsedTx[] = [];
-  for (const tab of REKAP_TABS) {
+  for (const tab of tabs) {
     const csv = await fetchCsv(tab.gid);
     all = all.concat(extractYearTransactions(parseCsv(csv), tab.year));
   }
   return all;
 }
+
+// ============ Saldo resmi Bendahara ============
 
 export type TreasurySummaryData = {
   saldoResmi: number;
@@ -196,7 +266,8 @@ export type TreasurySummaryData = {
  * bawahnya sebagai saldo resmi.
  */
 export async function fetchTreasurySummary(): Promise<TreasurySummaryData> {
-  const csv = await fetchCsv(TOTAL_KEUANGAN_GID);
+  const gid = await resolveTotalKeuanganGid();
+  const csv = await fetchCsv(gid);
   const rows = parseCsv(csv);
 
   let asOfLabel = "";
@@ -219,6 +290,8 @@ export async function fetchTreasurySummary(): Promise<TreasurySummaryData> {
 
   return { saldoResmi, asOfLabel, cumAmount, bendaharaAmount };
 }
+
+// ============ Iuran bulanan per anggota ============
 
 export type DuesMonthSummary = { month: number; totalAmount: number; paidCount: number };
 export type DuesYearData = { year: number; memberCount: number; months: DuesMonthSummary[] };
@@ -263,10 +336,155 @@ function extractDuesSummary(rows: string[][], year: number): DuesYearData {
 }
 
 export async function fetchAllDues(): Promise<DuesYearData[]> {
+  const tabs = await resolveTabsByPattern(/^KAS\s+(\d{4})$/i, []);
   const results: DuesYearData[] = [];
-  for (const sheet of DUES_SHEET_NAMES) {
+
+  if (tabs.length > 0) {
+    for (const tab of tabs) {
+      const csv = await fetchCsv(tab.gid);
+      results.push(extractDuesSummary(parseCsv(csv), tab.year));
+    }
+    return results;
+  }
+
+  // Belum ada Google Sheets API -- pakai daftar nama statis sebagai fallback.
+  for (const sheet of FALLBACK_DUES_NAMES) {
     const csv = await fetchCsvBySheetName(sheet.name);
     results.push(extractDuesSummary(parseCsv(csv), sheet.year));
   }
   return results;
+}
+
+// ============ Tambah anggota baru ke tab "KAS <tahun berjalan>" ============
+
+function formatJoinLabel(date: Date): string {
+  return `${MONTH_SHORT_ID[date.getMonth()]} '${String(date.getFullYear()).slice(-2)}`;
+}
+
+export type AppendMemberResult = { synced: boolean; reason?: string };
+
+/**
+ * Dipanggil saat ada anggota baru mendaftar di web (/api/register). Cari
+ * tab "KAS <tahun ini>", sisipkan 1 baris baru tepat di atas baris total
+ * (mewarisi FORMAT + FORMULA dari baris anggota terakhir supaya kolom
+ * target/status ikut kehitung otomatis), lalu isi No/Nama/Bergabung dan
+ * kosongkan 12 kolom bulan (anggota baru belum bayar apa-apa).
+ *
+ * Gagal secara "graceful" (return {synced:false, reason}) kalau API belum
+ * dikonfigurasi atau tab tahun ini belum dibuat Bendahara -- TIDAK pernah
+ * melempar error ke pemanggil, supaya pendaftaran anggota tetap berhasil
+ * walau sinkron ke sheet gagal.
+ */
+export async function appendMemberToKasSheet(name: string, joinDate: Date): Promise<AppendMemberResult> {
+  if (!isGoogleSheetsConfigured()) {
+    return { synced: false, reason: "Google Sheets API belum dikonfigurasi." };
+  }
+
+  const currentYear = joinDate.getFullYear();
+  let tabs: SheetTab[];
+  try {
+    tabs = await listSheetTabs();
+  } catch (err) {
+    return {
+      synced: false,
+      reason: `Gagal membaca daftar tab spreadsheet: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const targetTab = tabs.find((t) => new RegExp(`^KAS\\s+${currentYear}$`, "i").test(t.title));
+  if (!targetTab) {
+    return { synced: false, reason: `Tab "KAS ${currentYear}" belum ada di spreadsheet.` };
+  }
+
+  const sheets = getSheetsClient();
+
+  let rows: string[][];
+  try {
+    const valuesRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `'${targetTab.title}'!A:T`,
+    });
+    rows = (valuesRes.data.values ?? []) as string[][];
+  } catch (err) {
+    return {
+      synced: false,
+      reason: `Gagal membaca isi tab "${targetTab.title}": ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const headerIndex = rows.findIndex((r) => (r[1] ?? "").trim().toLowerCase() === "nama");
+  if (headerIndex === -1) {
+    return { synced: false, reason: `Tidak menemukan header "Nama" di tab "${targetTab.title}".` };
+  }
+
+  const footerRowIndex = rows.length - 1;
+  const lastMemberRowIndex = footerRowIndex - 1;
+  if (lastMemberRowIndex <= headerIndex) {
+    return { synced: false, reason: `Tab "${targetTab.title}" belum punya baris anggota sebagai acuan format.` };
+  }
+
+  const lastNoDigits = (rows[lastMemberRowIndex][0] ?? "").replace(/[^0-9]/g, "");
+  const nextNo = lastNoDigits ? parseInt(lastNoDigits, 10) + 1 : lastMemberRowIndex - headerIndex;
+
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      requestBody: {
+        requests: [
+          {
+            insertDimension: {
+              range: { sheetId: targetTab.sheetId, dimension: "ROWS", startIndex: footerRowIndex, endIndex: footerRowIndex + 1 },
+              inheritFromBefore: true,
+            },
+          },
+          {
+            copyPaste: {
+              source: {
+                sheetId: targetTab.sheetId,
+                startRowIndex: lastMemberRowIndex,
+                endRowIndex: lastMemberRowIndex + 1,
+                startColumnIndex: 0,
+                endColumnIndex: 20,
+              },
+              destination: {
+                sheetId: targetTab.sheetId,
+                startRowIndex: footerRowIndex,
+                endRowIndex: footerRowIndex + 1,
+                startColumnIndex: 0,
+                endColumnIndex: 20,
+              },
+              pasteType: "PASTE_FORMULA",
+            },
+          },
+        ],
+      },
+    });
+
+    const newRowNum = footerRowIndex + 1; // 1-based, untuk referensi range A1
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `'${targetTab.title}'!A${newRowNum}:B${newRowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[String(nextNo), name]] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `'${targetTab.title}'!D${newRowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[formatJoinLabel(joinDate)]] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `'${targetTab.title}'!F${newRowNum}:Q${newRowNum}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [Array(12).fill("")] },
+    });
+  } catch (err) {
+    return {
+      synced: false,
+      reason: `Gagal menulis baris anggota baru: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  return { synced: true };
 }

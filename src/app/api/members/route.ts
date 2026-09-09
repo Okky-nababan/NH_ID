@@ -5,6 +5,7 @@ import { requireUser, requirePermission } from "@/lib/api-auth";
 import { hasPermission } from "@/lib/permissions";
 import { memberSchema } from "@/lib/validation";
 import { logAudit } from "@/lib/audit";
+import { appendMemberToKasSheet } from "@/lib/sheet-sync";
 
 const BASE_SELECT = {
   id: true,
@@ -101,6 +102,18 @@ export async function POST(request: Request) {
     description: `Menambahkan anggota baru: ${member.name}`,
     request,
   });
+
+  // Tambahkan baris anggota baru ke tab "KAS <tahun berjalan>" spreadsheet.
+  // Gagal secara graceful -- penambahan anggota tetap berhasil walau
+  // sinkron ke sheet gagal (mis. API belum dikonfigurasi).
+  try {
+    const result = await appendMemberToKasSheet(member.name, member.joinedAt);
+    if (!result.synced) {
+      console.warn(`Gagal sinkron anggota baru "${member.name}" ke spreadsheet: ${result.reason}`);
+    }
+  } catch (err) {
+    console.warn(`Gagal sinkron anggota baru "${member.name}" ke spreadsheet:`, err);
+  }
 
   return NextResponse.json({ member }, { status: 201 });
 }
