@@ -26,7 +26,12 @@ export async function POST(request: Request) {
   }
 
   const userId = session!.user.id;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    // Override default omit global (lihat lib/prisma.ts) -- perlu hash-nya
+    // untuk verifikasi password saat ini sebelum diganti.
+    omit: { passwordHash: false },
+  });
   if (!user) {
     return NextResponse.json({ error: "Akun tidak ditemukan" }, { status: 404 });
   }

@@ -20,6 +20,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
           include: { permissions: true },
+          // Override default omit global (lihat lib/prisma.ts) -- login
+          // butuh hash-nya untuk verifikasi password.
+          omit: { passwordHash: false },
         });
         if (!user || !user.isActive) return null;
 
