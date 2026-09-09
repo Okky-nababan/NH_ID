@@ -5,8 +5,9 @@ import { requireUser, requirePermission } from "@/lib/api-auth";
 import { hasPermission } from "@/lib/permissions";
 import { memberSchema } from "@/lib/validation";
 import { logAudit } from "@/lib/audit";
-import { appendMemberToKasSheet } from "@/lib/sheet-sync";
+import { appendMemberToKasSheet, fetchAllDuesDetail } from "@/lib/sheet-sync";
 import { linkPositionsForNewUser } from "@/lib/position-sync";
+import { syncCashPaymentsFromSheet } from "@/lib/cash-payment-sync";
 
 const BASE_SELECT = {
   id: true,
@@ -119,6 +120,17 @@ export async function POST(request: Request) {
   // Hubungkan otomatis ke jabatan kepengurusan yang namanya cocok tapi
   // belum punya akun terhubung.
   await linkPositionsForNewUser(member.id, member.name);
+
+  // Tarik langsung tagihan/riwayat iuran dari spreadsheet KAS untuk
+  // anggota baru ini -- supaya begitu ditambahkan, iuran yang sudah/belum
+  // dibayar langsung kelihatan tanpa menunggu sinkron manual/cron
+  // berikutnya.
+  try {
+    const duesDetail = await fetchAllDuesDetail();
+    await syncCashPaymentsFromSheet(duesDetail);
+  } catch (err) {
+    console.warn(`Gagal sinkron iuran untuk anggota baru "${member.name}":`, err);
+  }
 
   return NextResponse.json({ member }, { status: 201 });
 }
