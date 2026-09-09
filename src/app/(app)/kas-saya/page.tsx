@@ -39,15 +39,22 @@ export default async function KasSayaPage() {
   // bulan berjalan -- supaya kelihatan jelas tunggakan sisa tahun juga.
   const months = Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
     const hasJoinedByThisMonth = year > joinYear || (year === joinYear && m >= joinMonth);
+    const payment = paidByMonth.get(m) ?? null;
+    // Kalau ternyata ADA catatan pembayaran untuk bulan ini (mis. tanggal
+    // bergabung di sheet kosong sehingga fallback ke tanggal daftar akun
+    // web, padahal riwayat iuran dari sheet sudah ada sejak lebih awal),
+    // tetap dianggap "berlaku" -- status pembayaran yang sebenarnya lebih
+    // dipercaya daripada tebakan tanggal bergabung.
+    const isApplicable = hasJoinedByThisMonth || payment !== null;
     return {
       month: m,
       label: `${MONTH_NAMES_ID[m - 1]} ${year}`,
-      payment: paidByMonth.get(m) ?? null,
-      hasJoinedByThisMonth,
+      payment,
+      isApplicable,
     };
   });
 
-  const applicableMonths = months.filter((m) => m.hasJoinedByThisMonth);
+  const applicableMonths = months.filter((m) => m.isApplicable);
   const lunasCount = applicableMonths.filter((m) => m.payment?.status === "LUNAS").length;
   const unpaidMonths = applicableMonths.filter((m) => m.payment?.status !== "LUNAS");
 
@@ -117,7 +124,7 @@ export default async function KasSayaPage() {
                 </p>
               )}
             </div>
-            {m.hasJoinedByThisMonth ? (
+            {m.isApplicable ? (
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   CASH_STATUS_CLASS[m.payment?.status ?? "BELUM_BAYAR"]
