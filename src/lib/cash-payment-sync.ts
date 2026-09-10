@@ -1,41 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { firstTwoWordsKey } from "@/lib/name-match";
+import { looseNameMatch } from "@/lib/name-match";
 import type { DuesYearDetail } from "@/lib/sheet-sync";
-
-/**
- * Ambil semua tanggal bergabung yang berhasil diparsing dari sheet, ambil
- * yang PALING AWAL per anggota (kalau namanya muncul di beberapa tahun
- * dengan label berbeda) -- tanggal bergabung itu fakta historis tetap,
- * jadi label paling awal yang paling mendekati kebenaran.
- */
-function collectEarliestJoinDates(duesDetail: DuesYearDetail[]): Map<string, Date> {
-  const byNameKey = new Map<string, Date>();
-  for (const yearData of duesDetail) {
-    for (const row of yearData.rows) {
-      if (!row.joinedAt) continue;
-      const key = firstTwoWordsKey(row.name);
-      const existing = byNameKey.get(key);
-      if (!existing || row.joinedAt < existing) byNameKey.set(key, row.joinedAt);
-    }
-  }
-  return byNameKey;
-}
-
-/** Semua nama yang muncul di sheet tahun manapun (dengan/tanpa label
- * "Bergabung" terparsing) -- dipakai untuk kasus kolom kosong. */
-function collectAllSheetNameKeys(duesDetail: DuesYearDetail[]): Set<string> {
-  const keys = new Set<string>();
-  for (const yearData of duesDetail) {
-    for (const row of yearData.rows) keys.add(firstTwoWordsKey(row.name));
-  }
-  return keys;
-}
 
 /**
  * Sinkronisasi iuran bulanan PER ANGGOTA dari tab "KAS <tahun>" spreadsheet
  * ke tabel CashPayment (dipakai halaman "Kas Saya" dan "Uang Kas"). Setiap
- * baris nama di sheet dicocokkan ke akun anggota terdaftar dengan kunci 2
- * kata pertama (lihat name-match.ts) -- sama seperti pencocokan Kepengurusan.
+ * baris nama di sheet dicocokkan ke akun anggota terdaftar lewat
+ * `looseNameMatch` (lihat name-match.ts) -- sama seperti pencocokan
+ * Kepengurusan.
  *
  * Provenance: baris hasil sinkron ditandai `syncedFromSheet: true` dan
  * ditimpa ulang total tiap sinkron; catatan yang dimasukkan manual oleh
@@ -43,6 +15,19 @@ function collectAllSheetNameKeys(duesDetail: DuesYearDetail[]): Set<string> {
  * TIDAK PERNAH disentuh, dan kalau ada bentrok bulan yang sama, entri
  * manual itu yang menang (baris sinkron untuk kombinasi itu dilewati).
  */
+
+type MinimalUser = { id: string; name: string; joinedAt: Date };
+
+/**
+ * Untuk satu baris nama di sheet, cari akun anggota yang cocok. Return
+ * akun tunggal, atau null kalau tidak ada / ambigu (cocok >1 akun berbeda).
+ */
+function resolveUserForRow(rowName: string, users: MinimalUser[]): MinimalUser | "AMBIGUOUS" | null {
+  const matches = users.filter((u) => looseNameMatch(rowName, u.name));
+  if (matches.length === 0) return null;
+  if (matches.length > 1) return "AMBIGUOUS";
+  return matches[0];
+}
 
 export type CashPaymentSyncResult = {
   created: number;
@@ -73,14 +58,6 @@ export async function syncCashPaymentsFromSheet(
       select: { userId: true, month: true, year: true },
     }),
   ]);
-
-  const usersByKey = new Map<string, typeof allUsers>();
-  for (const u of allUsers) {
-    const key = firstTwoWordsKey(u.name);
-    const list = usersByKey.get(key) ?? [];
-    list.push(u);
-    usersByKey.set(key, list);
-  }
   const manualKeys = new Set(manualPayments.map((p) => `${p.userId}-${p.month}-${p.year}`));
 
   let skippedNoAccount = 0;
@@ -95,18 +72,31 @@ export async function syncCashPaymentsFromSheet(
     syncedFromSheet: true;
   }[] = [];
 
+  // Tanggal bergabung PALING AWAL yang terparsing dari sheet, per akun --
+  // tanggal bergabung itu fakta historis tetap, jadi label paling awal
+  // yang paling mendekati kebenaran.
+  const earliestJoinFromSheet = new Map<string, Date>();
+  // Akun yang namanya muncul di sheet tahun manapun (dengan/tanpa kolom
+  // "Bergabung" terparsing) -- dipakai untuk kasus kolom kosong.
+  const usersSeenInSheet = new Set<string>();
+
   for (const yearData of duesDetail) {
     for (const row of yearData.rows) {
-      const candidates = usersByKey.get(firstTwoWordsKey(row.name)) ?? [];
-      if (candidates.length === 0) {
+      const resolved = resolveUserForRow(row.name, allUsers);
+      if (resolved === null) {
         skippedNoAccount += 1;
         continue;
       }
-      if (candidates.length > 1) {
+      if (resolved === "AMBIGUOUS") {
         skippedAmbiguous += 1;
         continue;
       }
-      const user = candidates[0];
+      const user = resolved;
+      usersSeenInSheet.add(user.id);
+      if (row.joinedAt) {
+        const existing = earliestJoinFromSheet.get(user.id);
+        if (!existing || row.joinedAt < existing) earliestJoinFromSheet.set(user.id, row.joinedAt);
+      }
       for (const m of row.months) {
         if (manualKeys.has(`${user.id}-${m.month}-${yearData.year}`)) {
           skippedManualOverride += 1;
@@ -135,30 +125,21 @@ export async function syncCashPaymentsFromSheet(
     await prisma.cashPayment.createMany({ data: toCreate, skipDuplicates: true });
   }
 
-  // Sinkron tanggal bergabung (kolom "Bergabung" di sheet) ke User.joinedAt
-  // -- dipakai untuk membedakan "belum bergabung" vs "belum bayar" di
-  // halaman Kas Saya, dan supaya Profil Saya menampilkan tanggal yang
-  // sesuai dengan catatan resmi Bendahara.
+  // Sinkron tanggal bergabung ke User.joinedAt -- dipakai untuk membedakan
+  // "belum bergabung" vs "belum bayar" di halaman Kas Saya, dan supaya
+  // Profil Saya menampilkan tanggal yang sesuai catatan resmi Bendahara.
   //
   // PENTING: kolom "Bergabung" KOSONG di sheet berarti "sudah anggota
-  // sejak SEBELUM sheet ini mulai dicatat" (anggota lama) -- BUKAN
-  // "belum bergabung". Kalau dibiarkan, User.joinedAt tetap di tanggal
-  // default akun web didaftarkan (mis. hari ini), yang salah membuat
-  // anggota lama terlihat baru gabung bulan ini. Untuk kasus ini,
-  // tanggal bergabung diset ke 1 Januari tahun paling awal yang ada di
-  // sheet -- HANYA kalau itu memundurkan tanggal (tidak pernah memajukan
-  // tanggal yang sudah benar/lebih awal).
-  const earliestJoinDates = collectEarliestJoinDates(duesDetail);
-  const allSheetNameKeys = collectAllSheetNameKeys(duesDetail);
+  // sejak SEBELUM sheet ini mulai dicatat" (anggota lama) -- BUKAN "belum
+  // bergabung". Untuk kasus ini, tanggal bergabung diset ke 1 Januari
+  // tahun paling awal yang ada di sheet -- HANYA kalau itu memundurkan
+  // tanggal (tidak pernah memajukan tanggal yang sudah benar/lebih awal).
   const earliestSheetYear = Math.min(...years);
   const longtimeMemberSentinel = new Date(Date.UTC(earliestSheetYear, 0, 1));
 
   let joinDatesUpdated = 0;
-  for (const [key, candidates] of usersByKey) {
-    if (candidates.length !== 1) continue; // ambigu -- jangan tebak
-    const user = candidates[0];
-
-    const parsedJoinedAt = earliestJoinDates.get(key);
+  for (const user of allUsers) {
+    const parsedJoinedAt = earliestJoinFromSheet.get(user.id);
     if (parsedJoinedAt) {
       if (user.joinedAt.getTime() !== parsedJoinedAt.getTime()) {
         await prisma.user.update({ where: { id: user.id }, data: { joinedAt: parsedJoinedAt } });
@@ -166,8 +147,7 @@ export async function syncCashPaymentsFromSheet(
       }
       continue;
     }
-
-    if (allSheetNameKeys.has(key) && user.joinedAt > longtimeMemberSentinel) {
+    if (usersSeenInSheet.has(user.id) && user.joinedAt > longtimeMemberSentinel) {
       await prisma.user.update({
         where: { id: user.id },
         data: { joinedAt: longtimeMemberSentinel },

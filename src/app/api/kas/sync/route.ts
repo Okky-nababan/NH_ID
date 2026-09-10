@@ -81,7 +81,7 @@ async function runSync(request: Request, actorUserId: string | null, isCron: boo
     }
 
     // Sinkron iuran PER ANGGOTA ke CashPayment (Kas Saya / Uang Kas) --
-    // dicocokkan ke akun via 2 kata pertama nama (lihat name-match.ts).
+    // dicocokkan ke akun via looseNameMatch (lihat name-match.ts).
     const cashPaymentResult = await syncCashPaymentsFromSheet(duesDetail);
 
     const duesMemberTotal = dues.reduce((sum, y) => sum + y.memberCount, 0);

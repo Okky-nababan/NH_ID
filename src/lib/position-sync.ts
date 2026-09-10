@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { firstTwoWordsKey as matchKey } from "@/lib/name-match";
+import { looseNameMatch } from "@/lib/name-match";
 
 /**
  * Sinkronisasi otomatis antara jabatan kepengurusan (`Position.memberName`,
@@ -20,13 +20,12 @@ import { firstTwoWordsKey as matchKey } from "@/lib/name-match";
  */
 export async function linkPositionsForNewUser(userId: string, userName: string): Promise<number> {
   try {
-    const target = matchKey(userName);
     const unlinked = await prisma.position.findMany({
       where: { userId: null, memberName: { not: null } },
       select: { id: true, memberName: true },
     });
     const matchIds = unlinked
-      .filter((p) => p.memberName && matchKey(p.memberName) === target)
+      .filter((p) => p.memberName && looseNameMatch(p.memberName, userName))
       .map((p) => p.id);
     if (matchIds.length === 0) return 0;
 
@@ -61,19 +60,11 @@ export async function backfillAllPositionLinks(): Promise<BackfillResult> {
     prisma.user.findMany({ select: { id: true, name: true } }),
   ]);
 
-  const usersByKey = new Map<string, typeof allUsers>();
-  for (const u of allUsers) {
-    const key = matchKey(u.name);
-    const list = usersByKey.get(key) ?? [];
-    list.push(u);
-    usersByKey.set(key, list);
-  }
-
   const details: string[] = [];
   let linked = 0;
   for (const pos of unlinkedPositions) {
     if (!pos.memberName) continue;
-    const candidates = usersByKey.get(matchKey(pos.memberName)) ?? [];
+    const candidates = allUsers.filter((u) => looseNameMatch(pos.memberName!, u.name));
     if (candidates.length === 0) continue;
     if (candidates.length > 1) {
       details.push(
