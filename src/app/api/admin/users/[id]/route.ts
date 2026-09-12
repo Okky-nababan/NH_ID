@@ -30,12 +30,32 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  // Tidak ada admin/pengurus yang permanen -- siapa pun (termasuk diri
-  // sendiri) boleh turun dari role ADMIN, SELAMA masih ada minimal 1 admin
-  // aktif lain yang bisa melanjutkan tugas kelola user/izin. Ini mencegah
-  // organisasi terkunci tanpa admin sama sekali, tapi tidak lagi mengunci
-  // satu orang jadi admin selamanya.
-  if (id === session!.user.id && parsed.data.role && parsed.data.role !== "ADMIN") {
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { role: true, isActive: true },
+  });
+  if (!target) {
+    return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
+  }
+
+  // Tidak ada admin/pengurus yang permanen -- siapa pun boleh turun dari
+  // role ADMIN atau dinonaktifkan, SELAMA masih ada minimal 1 admin aktif
+  // lain yang bisa melanjutkan tugas kelola user/izin. Ini mencegah
+  // organisasi terkunci tanpa admin sama sekali.
+  //
+  // Bug sebelumnya: pengecekan ini cuma jalan untuk `id === session.user.id`
+  // (demosi/nonaktifkan diri sendiri) -- Admin A men-demosi atau
+  // menonaktifkan Admin B (bukan dirinya sendiri) sama sekali tidak dicek,
+  // jadi organisasi bisa berakhir 0 admin lewat jalur itu. Sekarang
+  // dicek untuk SIAPA PUN target yang saat ini admin aktif, terlepas dari
+  // siapa yang melakukan perubahan.
+  const wasActiveAdmin = target.role === "ADMIN" && target.isActive;
+  const resultingRole = parsed.data.role ?? target.role;
+  const resultingIsActive = parsed.data.isActive ?? target.isActive;
+  const willStayActiveAdmin = resultingRole === "ADMIN" && resultingIsActive;
+
+  if (wasActiveAdmin && !willStayActiveAdmin) {
     const otherActiveAdmins = await prisma.user.count({
       where: { role: "ADMIN", isActive: true, id: { not: id } },
     });
@@ -43,7 +63,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error:
-            "Tunjuk admin lain terlebih dahulu sebelum menurunkan role Anda sendiri -- organisasi harus selalu punya minimal 1 admin aktif.",
+            "Tunjuk admin lain terlebih dahulu -- organisasi harus selalu punya minimal 1 admin aktif.",
         },
         { status: 400 }
       );
