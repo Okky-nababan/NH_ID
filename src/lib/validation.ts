@@ -1,6 +1,22 @@
 import { z } from "zod";
 
 /**
+ * URL hasil upload (/api/upload) -- bisa berupa URL absolut (Vercel Blob
+ * di produksi, mis. "https://xxx.public.blob.vercel-storage.com/...") ATAU
+ * path relatif "/uploads/..." (fallback disk lokal saat BLOB_READ_WRITE_TOKEN
+ * belum diset, lihat api/upload/route.ts). z.string().url() akan menolak
+ * bentuk kedua, jadi validasi longgar ini sengaja menerima keduanya --
+ * hanya menolak string sembarangan yang jelas bukan URL/path (mis.
+ * "javascript:alert(1)" atau teks bebas) sebelum disimpan & dipakai
+ * sebagai `src` gambar/link di halaman.
+ */
+export const uploadedFileUrl = z
+  .string()
+  .refine((v) => /^https?:\/\//.test(v) || v.startsWith("/"), {
+    message: "URL file tidak valid",
+  });
+
+/**
  * Biodata dikumpulkan LENGKAP saat daftar, karena setelah ini anggota
  * tidak bisa mengedit sendiri (hanya Admin/Pengurus yang bisa, lewat
  * permintaan edit) -- lihat memberSchema & ProfileEditRequest.
@@ -96,7 +112,7 @@ export const memberSchema = z.object({
   memberNumber: z.string().trim().max(50).optional().or(z.literal("")),
   membershipStatus: z.enum(["AKTIF", "TIDAK_AKTIF", "PINDAH", "MENGUNDURKAN_DIRI"]),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
-  photoUrl: z.string().optional().or(z.literal("")),
+  photoUrl: uploadedFileUrl.optional().or(z.literal("")),
 });
 export type MemberInput = z.infer<typeof memberSchema>;
 
@@ -154,7 +170,7 @@ export const activitySchema = z.object({
   personInChargeId: z.string().optional().or(z.literal("")),
   status: z.enum(["DIRENCANAKAN", "BERLANGSUNG", "SELESAI", "DIBATALKAN"]),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
-  photoUrl: z.string().optional().or(z.literal("")),
+  photoUrl: uploadedFileUrl.optional().or(z.literal("")),
 });
 export type ActivityInput = z.infer<typeof activitySchema>;
 
@@ -219,7 +235,7 @@ export type AdminPasswordResetInput = z.infer<typeof adminPasswordResetSchema>;
 export const choirSongSchema = z.object({
   title: z.string().trim().min(1, "Judul lagu wajib diisi"),
   order: z.coerce.number().int().optional(),
-  pageUrls: z.array(z.string().min(1)).min(1, "Unggah minimal 1 halaman partitur"),
+  pageUrls: z.array(uploadedFileUrl).min(1, "Unggah minimal 1 halaman partitur"),
 });
 export type ChoirSongInput = z.input<typeof choirSongSchema>;
 export type ChoirSongOutput = z.output<typeof choirSongSchema>;
