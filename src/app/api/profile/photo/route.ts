@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
+import { uploadedFileUrl } from "@/lib/validation";
 
 const photoSchema = z.object({
-  photoUrl: z.string().min(1, "URL foto wajib diisi"),
+  photoUrl: uploadedFileUrl,
 });
 
 /**
