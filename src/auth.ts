@@ -40,12 +40,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    // Bug: menonaktifkan akun ("Nonaktifkan" di halaman Kelola User) atau
+    // menurunkan role Admin/Pengurus TIDAK berlaku untuk sesi yang sedang
+    // berjalan -- session pakai strategi JWT, jadi role/status akun hanya
+    // "difoto" sekali saat login dan disimpan di token. requirePermission()
+    // sudah mengecek izin granular langsung ke DB tiap request (lihat
+    // api-auth.ts), tapi role dan isActive TIDAK, sehingga akun yang baru
+    // saja dinonaktifkan Admin tetap bisa memakai seluruh aplikasi sampai
+    // token JWT-nya kedaluwarsa sendiri (default 30 hari).
+    //
+    // Perbaikan: verifikasi ulang ke DB setiap token diakses (bukan cuma
+    // saat login). `user` hanya terisi tepat saat `signIn()` dipanggil;
+    // pada akses berikutnya kita tarik ulang isActive/role/permissions
+    // terkini. Return `null` men-invalidate token (efeknya seperti logout
+    // paksa) kalau akun sudah dihapus/dinonaktifkan.
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
         token.role = user.role;
         token.permissions = user.permissions;
+        return token;
       }
+
+      if (!token.id) return token;
+      const current = await prisma.user.findUnique({
+        where: { id: token.id },
+        select: { isActive: true, role: true, permissions: { select: { permission: true } } },
+      });
+      if (!current || !current.isActive) return null;
+
+      token.role = current.role;
+      token.permissions = current.permissions.map((p) => p.permission);
       return token;
     },
     session({ session, token }) {
