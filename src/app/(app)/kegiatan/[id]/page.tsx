@@ -11,6 +11,7 @@ import {
   ATTENDANCE_STATUS_LABELS,
   ATTENDANCE_STATUS_CLASS,
 } from "@/lib/labels";
+import { getEffectiveActivityStatus } from "@/lib/activity-status";
 import { AttendanceForm } from "./attendance-form";
 
 function formatDate(date: Date) {
@@ -42,6 +43,8 @@ export default async function ActivityDetailPage({
   });
   if (!activity) notFound();
 
+  const effectiveStatus = getEffectiveActivityStatus(activity);
+
   // Privasi: anggota biasa hanya boleh melihat status kehadirannya sendiri,
   // bukan daftar kehadiran seluruh anggota lain untuk kegiatan ini.
   const visibleAttendances = canManageAttendance
@@ -71,9 +74,9 @@ export default async function ActivityDetailPage({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span
-              className={`rounded px-1.5 py-0.5 text-xs font-medium ${ACTIVITY_STATUS_CLASS[activity.status]}`}
+              className={`rounded px-1.5 py-0.5 text-xs font-medium ${ACTIVITY_STATUS_CLASS[effectiveStatus]}`}
             >
-              {ACTIVITY_STATUS_LABELS[activity.status]}
+              {ACTIVITY_STATUS_LABELS[effectiveStatus]}
             </span>
             {canManageActivities && (
               <Link
