@@ -7,6 +7,7 @@ import {
   ACTIVITY_STATUS_LABELS,
   ACTIVITY_STATUS_CLASS,
 } from "@/lib/labels";
+import { getEffectiveActivityStatus } from "@/lib/activity-status";
 import { RoutineButton } from "./routine-button";
 
 function formatDate(date: Date) {
@@ -28,7 +29,9 @@ export default async function KegiatanPage() {
   const upcoming = activities.filter((a) => a.date >= now).reverse();
   const past = activities.filter((a) => a.date < now);
 
-  const renderCard = (activity: (typeof activities)[number]) => (
+  const renderCard = (activity: (typeof activities)[number]) => {
+    const effectiveStatus = getEffectiveActivityStatus(activity);
+    return (
     <Link
       key={activity.id}
       href={`/kegiatan/${activity.id}`}
@@ -49,9 +52,9 @@ export default async function KegiatanPage() {
           )}
         </div>
         <span
-          className={`rounded px-1.5 py-0.5 text-xs font-medium ${ACTIVITY_STATUS_CLASS[activity.status]}`}
+          className={`rounded px-1.5 py-0.5 text-xs font-medium ${ACTIVITY_STATUS_CLASS[effectiveStatus]}`}
         >
-          {ACTIVITY_STATUS_LABELS[activity.status]}
+          {ACTIVITY_STATUS_LABELS[effectiveStatus]}
         </span>
       </div>
       <h3 className="mt-2 font-semibold text-slate-900">{activity.name}</h3>
@@ -61,7 +64,8 @@ export default async function KegiatanPage() {
         <p className="mt-1 text-xs text-slate-400">PJ: {activity.personInCharge.name}</p>
       )}
     </Link>
-  );
+    );
+  };
 
   return (
     <div className="space-y-8">
